@@ -9,7 +9,8 @@ import argparse
 
 # import from dex-realtime-retargeting
 import sys
-sys.path.insert(0, "/home/zimo/Documents/dex_realtime_retargeting")
+import os
+sys.path.insert(0, os.environ["DEX_RETARGETING_PATH"])
 
 from vector_retargeting.csv_retargeting_fingertip import (
     load_finger_config,
