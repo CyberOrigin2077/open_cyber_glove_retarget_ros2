@@ -12,9 +12,14 @@ import time
 from pathlib import Path
 import multiprocessing
 from queue import Empty
+from scipy.spatial.transform import Rotation
+
+# 添加调试信息，打印Python路径
+import sys
+print("Python路径:")
+print(sys.path)
 
 # 添加本地lib路径到Python路径
-import sys
 import os
 import os.path as osp
 
@@ -22,21 +27,28 @@ current_dir = osp.dirname(osp.abspath(__file__))
 package_dir = osp.dirname(osp.dirname(current_dir))
 lib_dir = osp.join(package_dir, "lib")
 sys.path.insert(0, lib_dir)
+print(f"添加本地lib路径: {lib_dir}")
 
 # 从本地lib导入dex_retargeting模块
 import dex_retargeting
+print(f"dex_retargeting模块位置: {dex_retargeting.__file__}")
 # 注释掉可能导致错误的reload语句
 # import importlib
 # importlib.reload(dex_retargeting)
 # importlib.reload(dex_retargeting.constants)
 
-# 直接导入需要的模块和类
+# 直接从本地导入constants模块
 from dex_retargeting.constants import (
     RobotName,
     RetargetingType,
     HandType,
     get_default_config_path,
+    ROBOT_NAME_MAP,
 )
+
+# 打印RobotName枚举中的所有成员
+print("RobotName枚举中的所有成员:")
+print([name for name in RobotName.__members__])
 
 from dex_retargeting.retargeting_config import RetargetingConfig
 
@@ -55,18 +67,11 @@ INSPIRE_JOINT_ORDER = [
 ]
 
 ROBOTERAX_JOINT_ORDER = [
-    "right_hand_thumb_rota_joint1",
-    "right_hand_thumb_bend_joint",
-    "right_hand_thumb_rota_joint2",
-    "right_hand_index_bend_joint",
-    "right_hand_index_joint1",
-    "right_hand_index_joint2",
-    "right_hand_mid_joint1",
-    "right_hand_mid_joint2",
-    "right_hand_ring_joint1",
-    "right_hand_ring_joint2",
-    "right_hand_pinky_joint1",
-    "right_hand_pinky_joint2",
+    'right_hand_thumb_bend_joint', 'right_hand_thumb_rota_joint1', 'right_hand_thumb_rota_joint2', 
+                        'right_hand_index_bend_joint', 'right_hand_index_joint1', 'right_hand_index_joint2',
+                        'right_hand_mid_joint1', 'right_hand_mid_joint2',
+                        'right_hand_ring_joint1', 'right_hand_ring_joint2',
+                        'right_hand_pinky_joint1', 'right_hand_pinky_joint2'
 ]
 
 
@@ -86,7 +91,174 @@ OPERATOR2MANO_LEFT = np.array(
     ]
 )
 
-from scipy.spatial.transform import Rotation
+
+
+def load_finger_config():
+    """
+    加载手指配置信息
+    
+    Returns:
+        字典，包含关节映射和可视化设置
+    """
+    # 默认配置
+    config = {
+        "joint_mapping": {
+            "thumb_end": 3,
+            "index_end": 7,
+            "middle_end": 11,
+            "ring_end": 15,
+            "pinky_end": 19
+        },
+        "visualization": {
+            "scale_factor": 0.8,
+            "joint_radius": 0.01,
+            "fingertip_radius": 0.005,
+            "position_offset": [0.0, 0.0, 0.0]
+        }
+    }
+    return config
+
+
+# Function to visualize hand joints in 3D space using SAPIEN
+def visualize_hand_joints(scene, joint_positions, fingertip_positions, hand_type="Right", joint_orientations=None, finger_config=None, position_offset=None, name_prefix=""):
+    """
+    Visualize hand joints and fingertips in 3D space using SAPIEN
+    
+    Args:
+        scene: SAPIEN scene
+        joint_positions: Array of joint positions [20, 3]
+        fingertip_positions: Dictionary with fingertip positions
+        hand_type: "Left" or "Right"
+        joint_orientations: Optional array of joint orientations as quaternions [20, 4]
+        finger_config: Configuration dictionary containing joint mappings and visualization settings
+        position_offset: Optional offset to apply to visualization positions [x, y, z]
+        name_prefix: Prefix to add to visualization object names to differentiate left/right hands
+    """
+    # Load configuration if not provided
+    if finger_config is None:
+        finger_config = load_finger_config()
+    
+    # Get visualization settings from config
+    viz_config = finger_config.get("visualization", {})
+    
+    # Get joint mappings from config
+    joint_mapping = finger_config["joint_mapping"]
+    
+    # Determine if left or right hand
+    is_left_hand = True
+    if hand_type is not None:
+        if isinstance(hand_type, str):
+            is_left_hand = hand_type.lower() == "left"
+        else:
+            is_left_hand = hand_type.name.lower() == "left"
+    
+    # Define finger chains (only used for fingertip colors)
+    finger_chains = {
+        'thumb': [0, 1, 2, joint_mapping["thumb_end"]],
+        'index': [0, 4, 5, 6, joint_mapping["index_end"]],
+        'middle': [0, 8, 9, 10, joint_mapping["middle_end"]],
+        'ring': [0, 12, 13, 14, joint_mapping["ring_end"]],
+        'pinky': [0, 16, 17, 18, joint_mapping["pinky_end"]],
+    }
+    
+    # Finger colors for visualization
+    finger_colors = {
+        'thumb': [1.0, 0.2, 0.2],   # Thumb - red
+        'index': [0.2, 1.0, 0.2],   # Index - green
+        'middle': [0.2, 0.2, 1.0],  # Middle - blue
+        'ring': [1.0, 1.0, 0.2],    # Ring - yellow
+        'pinky': [1.0, 0.2, 1.0],   # Pinky - purple
+    }
+    
+    # Get visualization settings from config
+    scale_factor = viz_config.get("scale_factor", 1.1)
+    joint_radius = viz_config.get("joint_radius", 0.01)
+    fingertip_radius = viz_config.get("fingertip_radius", 0.005)
+    default_offset = viz_config.get("position_offset", [0.25, 0, 0.25])
+    
+    # Use provided position_offset if specified, otherwise use default from config
+    if position_offset is not None:
+        pos_offset = np.array(position_offset)
+    else:
+        pos_offset = np.array(default_offset)
+    
+    # Keep track of visualization objects to allow returning them
+    vis_objects = []
+    
+    # Add a prefix to each visualization object, if not provided use default value
+    # Ensure the prefix is a valid string
+    if name_prefix is None:
+        name_prefix = ""
+    
+    # Only clear visualization objects for current hand type (if there's a prefix)
+    if name_prefix:
+        for actor in scene.get_all_actors():
+            if actor.name.startswith(name_prefix):
+                try:
+                    scene.remove_actor(actor)
+                except Exception as e:
+                    logger.debug(f"Failed to remove actor {actor.name}: {e}")
+    
+    # Visualize joints
+    for i in range(len(joint_positions)):
+        pos = joint_positions[i] * scale_factor + pos_offset
+        builder = scene.create_actor_builder()
+        # Create render material with color
+        material = sapien.render.RenderMaterial()
+        
+        # 为不同的手指关节设置不同的颜色
+        # 根据关节索引确定是哪个手指的关节
+        if i == 0:  # 手腕
+            material.base_color = [0.5, 0.5, 0.5, 1.0]  # 灰色
+        elif i in [1, 2, 3, 4]:  # 拇指关节
+            material.base_color = [1.0, 0.2, 0.2, 1.0]  # 红色
+        elif i in [5, 6, 7, 8]:  # 食指关节
+            material.base_color = [0.2, 1.0, 0.2, 1.0]  # 绿色
+        elif i in [9, 10, 11, 12]:  # 中指关节
+            material.base_color = [0.2, 0.2, 1.0, 1.0]  # 蓝色
+        elif i in [13, 14, 15, 16]:  # 无名指关节
+            material.base_color = [1.0, 1.0, 0.2, 1.0]  # 黄色
+        elif i in [17, 18, 19, 20]:  # 小指关节
+            material.base_color = [1.0, 0.2, 1.0, 1.0]  # 紫色
+        else:
+            material.base_color = [0.7, 0.7, 0.7, 1.0]  # 默认灰色
+        
+        # 调整关节大小，让指尖更明显
+        radius = joint_radius
+            
+        builder.add_sphere_visual(radius=radius, material=material)
+        joint = builder.build(name=f"{name_prefix}joint_{i}")
+        joint.set_pose(sapien.Pose(pos))
+        vis_objects.append(joint)
+    
+    # Visualize fingertips
+    for finger_name, chain in finger_chains.items():
+        if finger_name in fingertip_positions:
+            tip_pos = fingertip_positions[finger_name] * scale_factor + pos_offset
+            builder = scene.create_actor_builder()
+            # Create render material with color
+            material = sapien.render.RenderMaterial()
+            material.base_color = finger_colors[finger_name] + [1.0]
+            builder.add_sphere_visual(radius=fingertip_radius, material=material)
+            fingertip = builder.build(name=f"{name_prefix}fingertip_{finger_name}")
+            fingertip.set_pose(sapien.Pose(tip_pos))
+            vis_objects.append(fingertip)
+    
+    # Visualize fingertip joint axes
+    if joint_orientations is not None:
+        # Define fingertip joints from config
+        fingertip_joints = {
+            'thumb': joint_mapping["thumb_end"],
+            'index': joint_mapping["index_end"],
+            'middle': joint_mapping["middle_end"],
+            'ring': joint_mapping["ring_end"],
+            'pinky': joint_mapping["pinky_end"]
+        }
+        
+        # visualize_joint_axes(scene, joint_positions, joint_orientations, fingertip_joints, finger_config)
+    
+    # Return created visualization objects to allow removing them later
+    return vis_objects
 
 
 def estimate_frame_from_hand_points(keypoint_3d_array: np.ndarray) -> np.ndarray:
@@ -421,7 +593,7 @@ class HandRetargetNode(Node):
         elif "roboterax" in robot_name:
             robot.set_pose(sapien.Pose([0, 0, 0]))  # 根据Roboterax的实际情况调整
         else:
-            robot.set_pose(sapien.Pose([0, 0, -0.1]))  # 默认
+            robot.set_pose(sapien.Pose([0, 0, 0]))  # 默认
 
         # 获取关节名称
         retargeting_joint_names = retargeting.joint_names if hasattr(retargeting, "joint_names") else []
@@ -463,6 +635,46 @@ class HandRetargetNode(Node):
                 # 处理标记数据
                 joint_pos, joint_ori = process_hand_marker_array(msg, hand_type=hand_type)
                 
+                # 对关节点坐标进行放缩和偏移来微调重定向效果
+                if joint_pos is not None:
+                    # 定义缩放因子和偏移量（可以根据需要调整）
+                    scale_factors = {
+                        'global': 1.2,  # 全局缩放因子
+                        'thumb': 1.1,   # 拇指缩放因子
+                        'index': 1.0,   # 食指缩放因子
+                        'middle': 1.0,  # 中指缩放因子
+                        'ring': 1.0,    # 无名指缩放因子
+                        'pinky': 1.0    # 小指缩放因子
+                    }
+                    
+                    # 定义关节组
+                    joint_groups = {
+                        'thumb': [1, 2, 3, 4],    # 拇指关节索引
+                        'index': [5, 6, 7, 8],    # 食指关节索引
+                        'middle': [9, 10, 11, 12], # 中指关节索引
+                        'ring': [13, 14, 15, 16],  # 无名指关节索引
+                        'pinky': [17, 18, 19, 20]  # 小指关节索引
+                    }
+                    
+                    # 全局缩放
+                    joint_pos = joint_pos * scale_factors['global']
+                    
+                    # 对每个手指单独缩放
+                    for finger, indices in joint_groups.items():
+                        # 确保索引在有效范围内
+                        valid_indices = [idx for idx in indices if idx < joint_pos.shape[0]]
+                        if valid_indices:
+                            # 获取手腕位置作为基准点
+                            wrist_pos = joint_pos[0] if joint_pos.shape[0] > 0 else np.zeros(3)
+                            
+                            for idx in valid_indices:
+                                # 计算相对于手腕的位置
+                                rel_pos = joint_pos[idx] - wrist_pos
+                                # 应用缩放
+                                scaled_rel_pos = rel_pos * scale_factors[finger]
+                                # 更新关节位置
+                                joint_pos[idx] = wrist_pos + scaled_rel_pos
+                
                 # 使用重定向逻辑处理关节位置
                 retargeting_type = retargeting.optimizer.retargeting_type
                 indices = retargeting.optimizer.target_link_human_indices
@@ -478,6 +690,89 @@ class HandRetargetNode(Node):
                 
                 # 设置机器人姿势
                 robot.set_qpos(qpos[retargeting_to_sapien])
+                
+                # 获取机器人手指关节的位置（通过正向运动学）
+                robot_joints = robot.get_active_joints()
+                robot_joint_positions = []
+                robot_joint_names = []
+                
+                # 收集机器人关节位置和名称
+                for joint in robot_joints:
+                    # 获取关节在世界坐标系中的位置
+                    link = joint.get_child_link()
+                    if link:
+                        pos = link.get_pose().p
+                        robot_joint_positions.append(pos)
+                        robot_joint_names.append(joint.get_name())
+                
+                # # 打印调试信息
+                # logger.info(f"机器人关节数量: {len(robot_joint_positions)}")
+                # if robot_joint_positions:
+                #     logger.info(f"机器人关节名称: {robot_joint_names}")
+                
+                # 可视化手指关节
+                # 获取手掌位置和手指关节位置
+                if joint_pos is not None and len(joint_pos) > 0:
+                    # 创建指尖位置字典
+                    fingertip_positions = {}
+                    finger_config = load_finger_config()
+                    joint_mapping = finger_config["joint_mapping"]
+                    
+                    # 如果有足够的关节点，添加指尖位置
+                    if len(joint_pos) > max(joint_mapping.values()):
+                        fingertip_positions = {
+                            'thumb': joint_pos[joint_mapping["thumb_end"]],
+                            'index': joint_pos[joint_mapping["index_end"]],
+                            'middle': joint_pos[joint_mapping["middle_end"]],
+                            'ring': joint_pos[joint_mapping["ring_end"]],
+                            'pinky': joint_pos[joint_mapping["pinky_end"]]
+                        }
+                    
+                    # 可视化人手关节点（输入）
+                    name_prefix = f"{hand_type}_human_hand_"
+                    visualize_hand_joints(
+                        scene, 
+                        joint_pos, 
+                        fingertip_positions, 
+                        hand_type=hand_type,
+                        joint_orientations=joint_ori if 'joint_ori' in locals() else None,
+                        finger_config=finger_config,
+                        name_prefix=name_prefix,
+                        position_offset=[0, 0.3, 0]  # 向右偏移一点，避免与机器人手重叠
+                    )
+                    
+                    # 可视化机器人手关节点（输出）
+                    if robot_joint_positions:
+                        # 转换为numpy数组
+                        robot_joints_np = np.array(robot_joint_positions)
+                        
+                        # 创建机器人指尖位置字典（简化版，仅用于演示）
+                        robot_fingertips = {}
+                        
+                        # 尝试找到机器人手的指尖关节
+                        for i, name in enumerate(robot_joint_names):
+                            if "thumb" in name.lower() and "tip" in name.lower():
+                                robot_fingertips["thumb"] = robot_joint_positions[i]
+                            elif "index" in name.lower() and "tip" in name.lower():
+                                robot_fingertips["index"] = robot_joint_positions[i]
+                            elif "middle" in name.lower() and "tip" in name.lower():
+                                robot_fingertips["middle"] = robot_joint_positions[i]
+                            elif "ring" in name.lower() and "tip" in name.lower():
+                                robot_fingertips["ring"] = robot_joint_positions[i]
+                            elif "pinky" in name.lower() and "tip" in name.lower():
+                                robot_fingertips["pinky"] = robot_joint_positions[i]
+                        
+                        # 可视化机器人手关节
+                        robot_name_prefix = f"{hand_type}_robot_hand_"
+                        visualize_hand_joints(
+                            scene, 
+                            robot_joints_np, 
+                            robot_fingertips, 
+                            hand_type=hand_type,
+                            finger_config=finger_config,
+                            name_prefix=robot_name_prefix,
+                            position_offset=[0, 0, 0]  # 不需要偏移，使用机器人的实际位置
+                        )
 
                 # 渲染场景
                 for _ in range(2):
@@ -560,10 +855,11 @@ def main(args=None):
 
     # 打印所有可用的机器人名称
     print("可用的机器人名称:")
-    print([name for name in RobotName.__members__])
+    available_robots = [name for name in RobotName.__members__]
+    print(available_robots)
     
     # 检查用户指定的机器人名称是否在可用列表中
-    if args.robot_name not in RobotName.__members__:
+    if args.robot_name not in available_robots:
         print(f"警告: 机器人名称 '{args.robot_name}' 不在可用列表中")
 
     # 初始化ROS2
@@ -582,6 +878,9 @@ def main(args=None):
         print("接收到中断信号，退出节点")
     except Exception as e:
         print(f"运行节点时出错: {e}")
+        # 打印更详细的错误信息
+        import traceback
+        traceback.print_exc()
     finally:
         # 清理资源
         if 'node' in locals():
