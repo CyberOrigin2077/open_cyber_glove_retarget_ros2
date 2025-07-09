@@ -42,6 +42,14 @@ INSPIRE_JOINT_ORDER = [
     'thumb_proximal_yaw_joint'
 ]
 
+ROBOTERAX_JOINT_ORDER = [
+'right_hand_thumb_rota_joint1', 'right_hand_thumb_bend_joint', 'right_hand_thumb_rota_joint2', 
+                      'right_hand_index_bend_joint', 'right_hand_index_joint1', 'right_hand_index_joint2',
+                      'right_hand_mid_joint1', 'right_hand_mid_joint2',
+                      'right_hand_ring_joint1', 'right_hand_ring_joint2',
+                      'right_hand_pinky_joint1', 'right_hand_pinky_joint2'
+]
+
 class HandRetargetNode(Node):
     def __init__(
         self,
@@ -66,15 +74,26 @@ class HandRetargetNode(Node):
         )
 
         retargeting_joint_names = self.retargeting.get_joint_names(hand_type=self.hand_type)
+        # 打印实际的关节名称，以便调试
+        self.get_logger().info(f"Available joint names: {retargeting_joint_names}")
 
         if robot_name == "inspire":
+
             self.retargeting_to_robot = np.array(
                 [retargeting_joint_names.index(name) for name in INSPIRE_JOINT_ORDER]
             ).astype(int)
+        elif robot_name == "roboterax":
+            self.retargeting_to_robot = np.array(
+                [retargeting_joint_names.index(name) for name in ROBOTERAX_JOINT_ORDER]
+            ).astype(int)
+            # self.retargeting_to_robot = np.array(
+            #     [retargeting_joint_names.index(name) for name in INSPIRE_JOINT_ORDER]
+            # ).astype(int)
         else:
             self.retargeting_to_robot = np.array(
                 [retargeting_joint_names.index(name) for name in retargeting_joint_names]
             ).astype(int)
+
 
         self.sim_vis = sim_vis
         if self.sim_vis:
@@ -118,7 +137,9 @@ class HandRetargetNode(Node):
             # Load robot and set to a good pose
             loader = self.scene.create_urdf_loader()
             filepath = Path(self.retargeting.configs[hand_type].urdf_path)
+            self.get_logger().info(f"Original filepath: {filepath}")
             robot_name = filepath.stem
+            self.get_logger().info(f"Robot name from filepath: {robot_name}")
             loader.load_multiple_collisions_from_file = True
 
             # Set scale based on robot type - exactly as in csv_retargeting_fingertip.py
@@ -136,12 +157,32 @@ class HandRetargetNode(Node):
                 loader.scale = 1.4
             elif "svh" in robot_name:
                 loader.scale = 1.5
+            elif "roboterax" in robot_name:
+                loader.scale = 1.0  # 根据Roboterax的实际大小调整
 
+            # 特殊处理roboterax的文件路径
+            if "roboterax" in str(robot_name).lower() or "robotera" in str(filepath).lower():
+                # 对于roboterax，直接使用特定的文件名，不进行任何替换
+                self.get_logger().info(f"Using original file for roboterax: {filepath}")
+                filepath = str(filepath)  # 保持原样
             # Fix the bug of the urdf file name for inspire hand - exactly as in csv_retargeting_fingertip.py
-            if "glb" not in robot_name and not robot_name.startswith("inspire"):
+            elif "glb" not in robot_name and not robot_name.startswith("inspire"):
                 filepath = str(filepath).replace(".urdf", "_glb.urdf")
+                self.get_logger().info(f"Applied _glb suffix: {filepath}")
             else:
                 filepath = str(filepath)
+                self.get_logger().info(f"Using original filepath: {filepath}")
+                
+            # 打印实际使用的URDF文件路径，以便调试
+            self.get_logger().info(f"Final URDF path: {filepath}")
+            
+            # 检查文件是否存在
+            if not os.path.exists(filepath):
+                self.get_logger().error(f"URDF file not found: {filepath}")
+                available_files = os.listdir(str(Path(filepath).parent))
+                self.get_logger().info(f"Available files in directory: {available_files}")
+                raise FileNotFoundError(f"URDF file not found: {filepath}")
+
             self.robot = loader.load(filepath)
 
             # Set robot pose based on robot type - exactly as in csv_retargeting_fingertip.py
@@ -159,6 +200,8 @@ class HandRetargetNode(Node):
                 self.robot.set_pose(sapien.Pose([0, 0, -0.15]))
             elif "svh" in robot_name:
                 self.robot.set_pose(sapien.Pose([0, 0, -0.13]))
+            elif "roboterax" in robot_name:
+                self.robot.set_pose(sapien.Pose([0, 0, 0]))  # 根据Roboterax的实际情况调整
             else:
                 self.robot.set_pose(sapien.Pose([0, 0, -0.1]))  # Default
 
@@ -195,8 +238,18 @@ class HandRetargetNode(Node):
             self.get_logger().warn("Received empty marker array")
             return
 
+        # # Print received marker data
+        # self.get_logger().info(f"Received MarkerArray with {len(msg.markers)} markers")
+        # self.get_logger().info(f"msg.markers: {msg.markers}")
+        # self.get_logger().info(f"First marker position: {msg.markers[0].pose.position}")
+
+        
         # Retarget the positions
         retargeted_positions = self.retarget_joints(msg)
+
+
+        # Print retargeted positions
+        # self.get_logger().info(f"Retargeted positions: {retargeted_positions}")
 
         # Publish retargeted positions
         retargeted_msg = Float32MultiArray()
@@ -214,10 +267,25 @@ class HandRetargetNode(Node):
             np.ndarray: Retargeted joint positions
         """
         # refer to https://github.com/CyberOrigin2077/dex_realtime_retargeting/blob/main/vector_retargeting/utils/ros2_realtime_retargeting.py
+        # 获取关节名称以供打印使用
+        retargeting_joint_names = self.retargeting.get_joint_names(hand_type=self.hand_type)
+        
+        # # 打印映射信息
+        # print("Sapien关节名称:", self.sapien_joint_names if hasattr(self, 'sapien_joint_names') else "未初始化")
+        # print("当前索引映射:", self.retargeting_to_robot)
+        # print("映射后的顺序:", [retargeting_joint_names[i] for i in self.retargeting_to_robot])
+
+        # 原有代码
         joint_pos, joint_ori = process_hand_marker_array(
             msg,
             hand_type=self.hand_type
         )
+
+        # # Print extracted joint positions and orientations
+        # self.get_logger().info(f"Extracted joint positions shape: {joint_pos.shape}")
+        # self.get_logger().info(f"Sample joint positions: {joint_pos[:3]}")
+        # self.get_logger().info(f"Extracted joint orientations shape: {joint_ori.shape}")
+        # self.get_logger().info(f"Sample joint orientations: {joint_ori[:3]}")
 
         if self.hand_type == "right":
             retarget_result, finger_pos = self.retargeting.process_frame(
@@ -231,14 +299,39 @@ class HandRetargetNode(Node):
                 left_joint_orientations=joint_ori,
                 fingertips_data=True,
             )
+            
+        # # Print retargeting results
+        # self.get_logger().info(f"Retargeting result keys: {list(retarget_result.keys())}")
+        # self.get_logger().info(f"Finger positions keys: {list(finger_pos.keys())}")
+        
         qpos = retarget_result[self.hand_type]
         # self.get_logger().info(f"Retargeted joint positions: {qpos}")
         if self.sim_vis:
             self.robot.set_qpos(qpos[self.retargeting_to_sapien])
-            # visualize_hand_joints(self.scene, np.zeros((20,3)), finger_pos, hand_type=self.hand_type, finger_config=self.finger_config)
+            visualize_hand_joints(self.scene, np.zeros((20,3)), finger_pos, hand_type=self.hand_type, finger_config=self.finger_config)
             for _ in range(2):
                 self.viewer.render()
+                # 打印机器人的实际关节名称
 
+        # if self.sim_vis:
+        #     print("Sapien关节名称:", self.sapien_joint_names)
+        # # 打印当前使用的索引映射
+        # print("当前索引映射:", self.retargeting_to_robot)
+        # print("映射后的顺序:", [retargeting_joint_names[i] for i in self.retargeting_to_robot])
+        # # 测试不同顺序
+        # test_qpos = np.zeros_like(qpos)
+        # # 尝试单独激活每个关节，观察效果
+        # for i in range(len(test_qpos)):
+        #     test_qpos[:] = 0
+        #     test_qpos[i] = 1.0  # 设置第i个关节为1.0弧度
+        #     if self.sim_vis:
+        #         self.robot.set_qpos(test_qpos[self.retargeting_to_sapien])
+        #         self.viewer.render()
+        #         print(f"激活关节 {i}: {retargeting_joint_names[i]}")
+        #         input("按Enter继续...")
+
+
+        # import pdb; pdb.set_trace()
         return qpos[self.retargeting_to_robot]
 
 
