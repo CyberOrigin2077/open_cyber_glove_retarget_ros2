@@ -19,6 +19,14 @@ import sys
 print("Python路径:")
 print(sys.path)
 
+# 过滤SAPIEN的STL警告消息
+import warnings
+import logging
+# 配置日志过滤器，过滤掉特定的SAPIEN警告
+logging.getLogger('sapien').setLevel(logging.ERROR)
+# 忽略特定警告
+warnings.filterwarnings("ignore", message="loading multiple convex collision meshes from STL file")
+
 # 添加本地lib路径到Python路径
 import os
 import os.path as osp
@@ -639,8 +647,8 @@ class HandRetargetNode(Node):
                 if joint_pos is not None:
                     # 定义缩放因子和偏移量（可以根据需要调整）
                     scale_factors = {
-                        'global': 1.2,  # 全局缩放因子
-                        'thumb': 1.1,   # 拇指缩放因子
+                        'global': 1.3,  # 全局缩放因子
+                        'thumb': 1.0,   # 拇指缩放因子
                         'index': 1.0,   # 食指缩放因子
                         'middle': 1.0,  # 中指缩放因子
                         'ring': 1.0,    # 无名指缩放因子
@@ -738,7 +746,7 @@ class HandRetargetNode(Node):
                         joint_orientations=joint_ori if 'joint_ori' in locals() else None,
                         finger_config=finger_config,
                         name_prefix=name_prefix,
-                        position_offset=[0, 0.3, 0]  # 向右偏移一点，避免与机器人手重叠
+                        position_offset=[0, 0, 0]  # 向右偏移一点，避免与机器人手重叠
                     )
                     
                     # 可视化机器人手关节点（输出）
