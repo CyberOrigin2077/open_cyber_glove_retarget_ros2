@@ -1,0 +1,605 @@
+#!/usr/bin/env python3
+
+import rclpy
+from rclpy.node import Node
+from visualization_msgs.msg import MarkerArray
+from std_msgs.msg import Float32MultiArray
+import numpy as np
+import argparse
+import cv2
+from loguru import logger
+import time
+from pathlib import Path
+import multiprocessing
+from queue import Empty
+
+# 添加本地lib路径到Python路径
+import sys
+import os
+import os.path as osp
+current_dir = osp.dirname(osp.abspath(__file__))
+package_dir = osp.dirname(osp.dirname(current_dir))
+lib_dir = osp.join(package_dir, "lib")
+sys.path.insert(0, lib_dir)
+
+# 如果环境变量DEX_RETARGETING_PATH存在，也添加它
+if "DEX_RETARGETING_PATH" in os.environ:
+    sys.path.insert(0, os.environ["DEX_RETARGETING_PATH"])
+
+from vector_retargeting.retargeting.utils import (
+    process_hand_marker_array,
+    transform_pose_to_wrist_frame,
+    visualize_hand_joints,
+)
+
+# 从本地lib导入dex_retargeting模块
+from dex_retargeting.constants import RobotName, RetargetingType, HandType, get_default_config_path
+from dex_retargeting.retargeting_config import RetargetingConfig
+
+from pathlib import Path
+import sapien
+from sapien.asset import create_dome_envmap
+from sapien.utils import Viewer
+
+INSPIRE_JOINT_ORDER = [
+    'pinky_proximal_joint',
+    'ring_proximal_joint', 
+    'middle_proximal_joint',
+    'index_proximal_joint',
+    'thumb_proximal_pitch_joint',
+    'thumb_proximal_yaw_joint'
+]
+
+ROBOTERAX_JOINT_ORDER = [
+'right_hand_thumb_rota_joint1', 'right_hand_thumb_bend_joint', 'right_hand_thumb_rota_joint2', 
+                      'right_hand_index_bend_joint', 'right_hand_index_joint1', 'right_hand_index_joint2',
+                      'right_hand_mid_joint1', 'right_hand_mid_joint2',
+                      'right_hand_ring_joint1', 'right_hand_ring_joint2',
+                      'right_hand_pinky_joint1', 'right_hand_pinky_joint2'
+]
+
+class HandRetargetNode(Node):
+    def __init__(
+        self,
+        robot_name="inspire",
+        hand_type="right",
+        retargeting_type="dexpilot",
+        sim_vis=False,
+    ):
+        super().__init__("hand_retarget_node")
+
+        self.hand_type = hand_type
+        self.robot_name = robot_name
+        
+        # 将字符串转换为枚举值
+        robot_name_enum = RobotName[robot_name]
+        hand_type_enum = HandType[hand_type]
+        retargeting_type_enum = RetargetingType[retargeting_type]
+        
+        self.get_logger().info(f"使用机器人: {robot_name_enum}, 手型: {hand_type_enum}, 重定向类型: {retargeting_type_enum}")
+        
+        # 创建消息队列
+        self.marker_queue = multiprocessing.Queue(maxsize=1000)
+        
+        # 查找机器人配置目录 - 考虑不同环境下的路径
+        # 首先尝试开发环境下的路径
+        dev_path = Path(package_dir) / "lib" / "dex-urdf" / "robots" / "hands"
+        # 然后尝试安装环境下的路径
+        install_path = Path(__file__).parent.parent.parent / "lib" / "dex-urdf" / "robots" / "hands"
+        
+        # 检查哪个路径存在
+        if dev_path.exists():
+            robot_config_path = dev_path
+        elif install_path.exists():
+            robot_config_path = install_path
+        else:
+            # 如果都不存在，尝试在当前工作目录下查找
+            cwd_path = Path.cwd() / "src" / "dex_retarget_wrapper_ros2_py" / "lib" / "dex-urdf" / "robots" / "hands"
+            if cwd_path.exists():
+                robot_config_path = cwd_path
+            else:
+                # 如果还是找不到，直接使用绝对路径
+                robot_config_path = Path("/home/wind/ros2_ws/src/dex_retarget_wrapper_ros2_py/lib/dex-urdf/robots/hands")
+                if not robot_config_path.exists():
+                    self.get_logger().error(f"找不到机器人配置目录，尝试过的路径：\n{dev_path}\n{install_path}\n{cwd_path}\n{robot_config_path}")
+                    raise ValueError(f"找不到机器人配置目录")
+        
+        self.get_logger().info(f"使用机器人配置路径: {robot_config_path}")
+        
+        # 设置默认URDF目录
+        RetargetingConfig.set_default_urdf_dir(str(robot_config_path))
+        
+        # 使用枚举值获取配置文件路径
+        config_path = get_default_config_path(robot_name_enum, retargeting_type_enum, hand_type_enum)
+        self.get_logger().info(f"使用配置文件: {config_path}")
+        
+        # 如果配置文件不存在，创建一个临时配置
+        if not os.path.exists(config_path):
+            self.get_logger().warning(f"配置文件不存在: {config_path}")
+            
+            # 查找URDF文件
+            robot_name_str = ROBOT_NAME_MAP[robot_name_enum]
+            urdf_path = str(robot_config_path / f"{robot_name_str}" / f"{robot_name_str}_{hand_type}.urdf")
+            if not os.path.exists(urdf_path):
+                # 尝试其他可能的路径
+                possible_paths = [
+                    str(robot_config_path / f"{robot_name_str}" / f"{robot_name_str}_{hand_type}.urdf"),
+                    str(robot_config_path / f"{robot_name_str}" / f"{robot_name_str}.urdf"),
+                    str(robot_config_path / "inspire_hand" / "inspire_hand_right.urdf")
+                ]
+                
+                for path in possible_paths:
+                    if os.path.exists(path):
+                        urdf_path = path
+                        self.get_logger().info(f"找到URDF文件: {urdf_path}")
+                        break
+                else:
+                    # 列出可用的URDF文件
+                    available_files = []
+                    for dirpath, dirnames, filenames in os.walk(robot_config_path):
+                        for filename in filenames:
+                            if filename.endswith('.urdf'):
+                                available_files.append(os.path.join(dirpath, filename))
+                    self.get_logger().info(f"目录中可用的URDF文件: {available_files}")
+                    raise ValueError(f"无法找到URDF文件")
+            
+            # 创建临时配置文件
+            tmp_config_path = f"/tmp/{robot_name}_{hand_type}_{retargeting_type}_config.yaml"
+            with open(tmp_config_path, "w") as f:
+                f.write(f"""
+robot_name: {robot_name}
+urdf_path: {urdf_path}
+target_link: palm_center
+retargeting:
+  type: {retargeting_type}
+  args:
+    object_name: human_hand_{hand_type.lower()}
+    qpos_limits_scale: 1.0
+    qpos_gain: 1.0
+""")
+            self.get_logger().info(f"创建临时配置文件: {tmp_config_path}")
+            config_path = tmp_config_path
+        
+        # 启动重定向处理进程
+        self.consumer_process = multiprocessing.Process(
+            target=self.start_retargeting, 
+            args=(self.marker_queue, str(robot_config_path), str(config_path), self.hand_type)
+        )
+        self.consumer_process.daemon = True
+        self.consumer_process.start()
+        
+        # 创建手部运动学标记的订阅者
+        self.marker_sub = self.create_subscription(
+            MarkerArray,
+            "/hand_kinematics_markers",
+            self.marker_callback,
+            1
+        )
+
+        # 创建重定向关节位置的发布者
+        self.retargeted_pub = self.create_publisher(
+            Float32MultiArray,
+            "/retargeted_qpos",
+            1
+        )
+        self.get_logger().info("手部重定向节点已初始化")
+    
+    def marker_callback(self, msg):
+        # 检查标记数组是否为空
+        if not msg.markers:
+            self.get_logger().warn("接收到空标记数组")
+            return
+        
+        # 将标记数据放入队列
+        self.marker_queue.put(msg)
+        self.get_logger().debug(f"已将标记数据放入队列，当前队列大小: {self.marker_queue.qsize()}")
+    
+    def start_retargeting(self, queue, robot_dir, config_path, hand_type):
+        """
+        在单独的进程中运行重定向处理
+        
+        Args:
+            queue: 用于接收标记数据的队列
+            robot_dir: 机器人配置目录
+            config_path: 重定向配置文件路径
+            hand_type: 手型（"left"或"right"）
+        """
+        logger.info(f"启动重定向处理进程，配置文件: {config_path}, 手型: {hand_type}")
+        
+        # 设置URDF目录
+        robot_dir = Path(robot_dir)
+        if not robot_dir.exists():
+            logger.error(f"机器人配置目录不存在: {robot_dir}")
+            # 尝试其他可能的路径
+            alt_paths = [
+                Path("/home/wind/ros2_ws/src/dex_retarget_wrapper_ros2_py/lib/dex-urdf/robots/hands"),
+                Path.cwd() / "src" / "dex_retarget_wrapper_ros2_py" / "lib" / "dex-urdf" / "robots" / "hands"
+            ]
+            for path in alt_paths:
+                if path.exists():
+                    robot_dir = path
+                    logger.info(f"使用替代机器人配置目录: {robot_dir}")
+                    break
+            else:
+                logger.error("无法找到有效的机器人配置目录")
+                raise FileNotFoundError(f"无法找到有效的机器人配置目录")
+        
+        RetargetingConfig.set_default_urdf_dir(str(robot_dir))
+        logger.info(f"设置URDF目录: {robot_dir}")
+        
+        # 保存原始的__post_init__方法
+        original_post_init = RetargetingConfig.__post_init__
+        
+        # 定义新的__post_init__方法，不检查URDF路径是否存在
+        def patched_post_init(self):
+            # 跳过URDF路径检查
+            pass
+        
+        # 使用monkey patch替换__post_init__方法
+        RetargetingConfig.__post_init__ = patched_post_init
+        
+        try:
+            # 加载配置
+            config = RetargetingConfig.load_from_file(config_path)
+            logger.info(f"成功加载配置，原始URDF路径: {config.urdf_path}")
+            
+            # 确保type是小写的
+            if hasattr(config, 'type') and isinstance(config.type, str):
+                config.type = config.type.lower()
+                logger.info(f"将重定向类型转换为小写: {config.type}")
+            
+            # 修复URDF路径
+            correct_urdf_path = str(robot_dir / "inspire_hand" / "inspire_hand_right.urdf")
+            logger.info(f"尝试使用正确的URDF路径: {correct_urdf_path}")
+            
+            if os.path.exists(correct_urdf_path):
+                config.urdf_path = correct_urdf_path
+                logger.info(f"使用正确的URDF路径: {correct_urdf_path}")
+            else:
+                # 尝试其他可能的路径
+                possible_paths = [
+                    str(robot_dir / "inspire_hand" / "inspire_hand_right.urdf"),
+                    str(robot_dir / "inspire_hand" / "inspire_hand_right_glb.urdf"),
+                    str(robot_dir / "inspire_hand" / "inspire_hand.urdf")
+                ]
+                
+                # 搜索整个目录
+                if not any(os.path.exists(p) for p in possible_paths):
+                    for dirpath, dirnames, filenames in os.walk(robot_dir):
+                        for filename in filenames:
+                            if filename.endswith('.urdf') and 'inspire' in filename.lower() and ('hand' in filename.lower() or 'right' in filename.lower()):
+                                correct_urdf_path = os.path.join(dirpath, filename)
+                                logger.info(f"找到可能的URDF文件: {correct_urdf_path}")
+                                break
+                        if os.path.exists(correct_urdf_path):
+                            break
+                else:
+                    # 使用第一个存在的路径
+                    for path in possible_paths:
+                        if os.path.exists(path):
+                            correct_urdf_path = path
+                            logger.info(f"找到URDF文件: {correct_urdf_path}")
+                            break
+                
+                if os.path.exists(correct_urdf_path):
+                    config.urdf_path = correct_urdf_path
+                    logger.info(f"使用URDF文件: {correct_urdf_path}")
+                else:
+                    # 如果还是找不到，使用我们找到的确切路径
+                    exact_path = "/home/wind/ros2_ws/src/dex_retarget_wrapper_ros2_py/lib/dex-urdf/robots/hands/inspire_hand/inspire_hand_right.urdf"
+                    if os.path.exists(exact_path):
+                        config.urdf_path = exact_path
+                        logger.info(f"使用确切路径: {exact_path}")
+        else:
+                        # 列出所有URDF文件
+                        available_files = []
+                        for dirpath, dirnames, filenames in os.walk(robot_dir):
+                            for filename in filenames:
+                                if filename.endswith('.urdf'):
+                                    available_files.append(os.path.join(dirpath, filename))
+                        logger.info(f"目录中可用的URDF文件: {available_files}")
+                        raise FileNotFoundError(f"找不到任何可用的URDF文件")
+            
+            # 恢复原始的__post_init__方法
+            RetargetingConfig.__post_init__ = original_post_init
+            
+            # 使用修改后的配置构建重定向器
+            retargeting = config.build()
+            logger.info("成功构建重定向器")
+            
+        except Exception as e:
+            # 恢复原始的__post_init__方法
+            RetargetingConfig.__post_init__ = original_post_init
+            logger.error(f"加载配置或构建重定向器失败: {e}")
+            raise
+            
+        # 设置SAPIEN渲染器
+        try:
+            sapien.render.set_viewer_shader_dir("default")
+            sapien.render.set_camera_shader_dir("default")
+        except Exception as e:
+            logger.warning(f"设置SAPIEN渲染器时出错，这可能不影响功能: {e}")
+            
+        # 创建场景
+        scene = sapien.Scene()
+            render_mat = sapien.render.RenderMaterial()
+            render_mat.base_color = [0.06, 0.08, 0.12, 1]
+            render_mat.metallic = 0.0
+            render_mat.roughness = 0.9
+            render_mat.specular = 0.8
+        scene.add_ground(-0.2, render_material=render_mat, render_half_size=[1000, 1000])
+
+        # 设置光照
+        scene.add_directional_light(np.array([1, 1, -1]), np.array([3, 3, 3]))
+        scene.add_point_light(np.array([2, 2, 2]), np.array([2, 2, 2]), shadow=False)
+        scene.add_point_light(np.array([2, -2, 2]), np.array([2, 2, 2]), shadow=False)
+        scene.set_environment_map(
+                create_dome_envmap(sky_color=[0.2, 0.2, 0.2], ground_color=[0.2, 0.2, 0.2])
+            )
+        scene.add_area_light_for_ray_tracing(
+                sapien.Pose([2, 1, 2], [0.707, 0, 0.707, 0]), np.array([1, 1, 1]), 5, 5
+            )
+
+        # 设置相机
+        cam = scene.add_camera(
+                name="main_camera",
+                width=600,
+                height=600,
+                fovy=1,
+                near=0.1,
+                far=10
+            )
+            cam.set_local_pose(sapien.Pose([0.50, 0, 0.0], [0, 0, 0, -1]))
+
+        # 设置查看器
+        viewer = Viewer()
+        viewer.set_scene(scene)
+        viewer.control_window.show_origin_frame = False
+        viewer.control_window.move_speed = 0.01
+        viewer.control_window.toggle_camera_lines(False)
+        viewer.set_camera_pose(cam.get_local_pose())
+
+        # 加载机器人
+        loader = scene.create_urdf_loader()
+        
+        # 获取URDF路径
+        filepath = Path(config.urdf_path)
+        logger.info(f"使用URDF文件: {filepath}")
+        
+        # 检查文件是否存在
+        if not os.path.exists(filepath):
+            logger.error(f"找不到URDF文件: {filepath}")
+            raise FileNotFoundError(f"找不到URDF文件: {filepath}")
+            
+            robot_name = filepath.stem
+        logger.info(f"从文件路径获取的机器人名称: {robot_name}")
+            loader.load_multiple_collisions_from_file = True
+
+        # 根据机器人类型设置缩放比例
+            if "ability" in robot_name:
+                loader.scale = 1.5
+            elif "dclaw" in robot_name:
+                loader.scale = 1.25
+            elif "allegro" in robot_name:
+                loader.scale = 1.4
+            elif "shadow" in robot_name:
+                loader.scale = 0.9
+            elif "bhand" in robot_name:
+                loader.scale = 1.5
+            elif "leap" in robot_name:
+                loader.scale = 1.4
+            elif "svh" in robot_name:
+                loader.scale = 1.5
+            elif "roboterax" in robot_name:
+                loader.scale = 1.0  # 根据Roboterax的实际大小调整
+
+            # 特殊处理roboterax的文件路径
+            if "roboterax" in str(robot_name).lower() or "robotera" in str(filepath).lower():
+                # 对于roboterax，直接使用特定的文件名，不进行任何替换
+            logger.info(f"使用roboterax的原始文件: {filepath}")
+                filepath = str(filepath)  # 保持原样
+        # 修复inspire手的URDF文件名称错误
+            elif "glb" not in robot_name and not robot_name.startswith("inspire"):
+                filepath = str(filepath).replace(".urdf", "_glb.urdf")
+            logger.info(f"应用_glb后缀: {filepath}")
+            else:
+                filepath = str(filepath)
+            logger.info(f"使用原始文件路径: {filepath}")
+                
+            # 打印实际使用的URDF文件路径，以便调试
+        logger.info(f"最终URDF路径: {filepath}")
+            
+            # 检查文件是否存在
+            if not os.path.exists(filepath):
+            logger.error(f"找不到URDF文件: {filepath}")
+                available_files = os.listdir(str(Path(filepath).parent))
+            logger.info(f"目录中可用的文件: {available_files}")
+            raise FileNotFoundError(f"找不到URDF文件: {filepath}")
+
+        # 加载机器人
+        robot = loader.load(filepath)
+
+        # 根据机器人类型设置姿势
+            if "ability" in robot_name:
+            robot.set_pose(sapien.Pose([0, 0, -0.15]))
+            elif "shadow" in robot_name:
+            robot.set_pose(sapien.Pose([0, 0, -0.2]))
+            elif "dclaw" in robot_name:
+            robot.set_pose(sapien.Pose([0, 0, -0.15]))
+            elif "allegro" in robot_name:
+            robot.set_pose(sapien.Pose([0, 0, -0.05]))
+            elif "bhand" in robot_name:
+            robot.set_pose(sapien.Pose([0, 0, -0.2]))
+            elif "leap" in robot_name:
+            robot.set_pose(sapien.Pose([0, 0, -0.15]))
+            elif "svh" in robot_name:
+            robot.set_pose(sapien.Pose([0, 0, -0.13]))
+            elif "roboterax" in robot_name:
+            robot.set_pose(sapien.Pose([0, 0, 0]))  # 根据Roboterax的实际情况调整
+            else:
+            robot.set_pose(sapien.Pose([0, 0, -0.1]))  # 默认
+
+        # 获取关节名称
+        retargeting_joint_names = retargeting.joint_names if hasattr(retargeting, 'joint_names') else []
+        if not retargeting_joint_names:
+            retargeting_joint_names = retargeting.get_joint_names(hand_type=hand_type)
+            
+        # 获取SAPIEN关节名称
+        sapien_joint_names = [joint.get_name() for joint in robot.get_active_joints()]
+        
+        # 设置从重定向到SAPIEN的映射
+        retargeting_to_sapien = np.array(
+            [retargeting_joint_names.index(name) for name in sapien_joint_names]
+        ).astype(int)
+        
+        # 设置从重定向到机器人的映射
+        if self.robot_name == "inspire":
+            retargeting_to_robot = np.array(
+                [retargeting_joint_names.index(name) for name in INSPIRE_JOINT_ORDER]
+            ).astype(int)
+        elif self.robot_name == "roboterax":
+            retargeting_to_robot = np.array(
+                [retargeting_joint_names.index(name) for name in ROBOTERAX_JOINT_ORDER]
+            ).astype(int)
+        else:
+            retargeting_to_robot = np.array(
+                [retargeting_joint_names.index(name) for name in retargeting_joint_names]
+            ).astype(int)
+
+        logger.info(f"机器人关节名称: {sapien_joint_names}")
+        
+        # 创建ROS2节点用于发布重定向的关节位置
+        ros_context = rclpy.Context()
+        ros_context.init()
+        ros_node = rclpy.create_node('retargeting_publisher', context=ros_context)
+        retargeted_pub = ros_node.create_publisher(Float32MultiArray, '/retargeted_qpos', 1)
+        
+        # 主循环
+        while True:
+            try:
+                # 从队列获取标记数据，超时5秒
+                msg = queue.get(timeout=5)
+                
+                # 处理标记数据
+        joint_pos, joint_ori = process_hand_marker_array(
+            msg,
+                    hand_type=hand_type
+                )
+                
+                # 使用重定向逻辑处理关节位置
+                retargeting_type = retargeting.optimizer.retargeting_type
+                indices = retargeting.optimizer.target_link_human_indices
+                
+                if retargeting_type == "POSITION":
+                    ref_value = joint_pos[indices, :]
+        else:
+                    origin_indices = indices[0, :]
+                    task_indices = indices[1, :]
+                    ref_value = joint_pos[task_indices, :] - joint_pos[origin_indices, :]
+                    
+                qpos = retargeting.retarget(ref_value)
+                
+                # 设置机器人姿势
+                robot.set_qpos(qpos[retargeting_to_sapien])
+                
+                # 渲染场景
+            for _ in range(2):
+                    viewer.render()
+                
+                # 发布重定向的关节位置
+                retargeted_msg = Float32MultiArray()
+                retargeted_msg.data = qpos[retargeting_to_robot].flatten().tolist()
+                retargeted_pub.publish(retargeted_msg)
+                
+                # 处理ROS2事件
+                rclpy.spin_once(ros_node, timeout_sec=0.001)
+                
+            except Empty:
+                logger.warning("5秒内未收到标记数据")
+                continue
+            except KeyboardInterrupt:
+                logger.info("接收到中断信号，退出重定向进程")
+                break
+            except Exception as e:
+                # 记录错误但继续运行，除非是致命错误
+                logger.error(f"处理标记数据时出错: {e}")
+                if isinstance(e, (ValueError, AttributeError, IndexError, TypeError)):
+                    # 这些错误可能是暂时的，继续运行
+                    continue
+                else:
+                    # 其他错误可能更严重，抛出异常
+                    logger.critical(f"遇到致命错误，退出进程: {e}")
+                    raise
+        
+        # 清理资源
+        ros_node.destroy_node()
+        ros_context.shutdown()
+    
+    def destroy_node(self):
+        # 终止重定向处理进程
+        if hasattr(self, 'consumer_process') and self.consumer_process.is_alive():
+            self.consumer_process.terminate()
+            self.consumer_process.join(timeout=1.0)
+            self.get_logger().info("已终止重定向处理进程")
+        
+        super().destroy_node()
+
+
+def main(args=None):
+    # 解析命令行参数
+    parser = argparse.ArgumentParser(description="Hand Retargeting Node")
+    parser.add_argument(
+        "--robot-name",
+        type=str,
+        required=False,
+        default="inspire",
+        help="Robot name",
+        choices=["inspire", "allegro", "shadow", "svh", "leap", "ability", "panda"],
+    )
+    parser.add_argument(
+        "--hand-type",
+        type=str,
+        required=False,
+        default="right",
+        choices=["right", "left"],
+        help="Hand type (right or left)",
+    )
+    parser.add_argument(
+        "--retargeting-type",
+        type=str,
+        required=False,
+        default="dexpilot",
+        choices=["dexpilot", "vector", "position"],
+        help="Retargeting type",
+    )
+    parser.add_argument(
+        "--sim-vis",
+        action="store_true",
+        help="Enable simulation visualization",
+    )
+
+    # 解析参数
+    args, unknown = parser.parse_known_args()
+
+    # 初始化ROS2
+    rclpy.init(args=unknown)
+
+    # 创建并运行节点
+    node = HandRetargetNode(
+        robot_name=args.robot_name,
+        hand_type=args.hand_type.lower(),
+        retargeting_type=args.retargeting_type.lower(),
+        sim_vis=args.sim_vis,
+    )
+
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()
+
+
+if __name__ == "__main__":
+    main()
