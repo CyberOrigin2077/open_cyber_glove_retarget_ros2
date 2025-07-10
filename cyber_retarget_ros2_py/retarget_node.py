@@ -14,20 +14,20 @@ import multiprocessing
 from queue import Empty
 from scipy.spatial.transform import Rotation
 
-# 添加调试信息，打印Python路径
+# Add debug information, print Python path
 import sys
-print("Python路径:")
+print("Python paths:")
 print(sys.path)
 
-# 过滤SAPIEN的STL警告消息
+# Filter SAPIEN STL warning messages
 import warnings
 import logging
-# 配置日志过滤器，过滤掉特定的SAPIEN警告
+# Configure log filter to filter out specific SAPIEN warnings
 logging.getLogger('sapien').setLevel(logging.ERROR)
-# 忽略特定警告
+# Ignore specific warnings
 warnings.filterwarnings("ignore", message="loading multiple convex collision meshes from STL file")
 
-# 添加本地lib路径到Python路径
+# Add local lib path to Python path
 import os
 import os.path as osp
 
@@ -35,17 +35,17 @@ current_dir = osp.dirname(osp.abspath(__file__))
 package_dir = osp.dirname(osp.dirname(current_dir))
 lib_dir = osp.join(package_dir, "lib")
 sys.path.insert(0, lib_dir)
-print(f"添加本地lib路径: {lib_dir}")
+print(f"Added local lib path: {lib_dir}")
 
-# 从本地lib导入dex_retargeting模块
+# Import dex_retargeting module from local lib
 import dex_retargeting
-print(f"dex_retargeting模块位置: {dex_retargeting.__file__}")
-# 注释掉可能导致错误的reload语句
+print(f"dex_retargeting module location: {dex_retargeting.__file__}")
+# Comment out potentially error-causing reload statements
 # import importlib
 # importlib.reload(dex_retargeting)
 # importlib.reload(dex_retargeting.constants)
 
-# 直接从本地导入constants模块
+# Import constants module directly from local
 from dex_retargeting.constants import (
     RobotName,
     RetargetingType,
@@ -54,8 +54,8 @@ from dex_retargeting.constants import (
     ROBOT_NAME_MAP,
 )
 
-# 打印RobotName枚举中的所有成员
-print("RobotName枚举中的所有成员:")
+# Print all members in RobotName enum
+print("All members in RobotName enum:")
 print([name for name in RobotName.__members__])
 
 from dex_retargeting.retargeting_config import RetargetingConfig
@@ -74,13 +74,25 @@ INSPIRE_JOINT_ORDER = [
     'thumb_proximal_yaw_joint'
 ]
 
-ROBOTERAX_JOINT_ORDER = [
+
+ROBOTERAX_RIGHT_JOINT_ORDER = [
     'right_hand_thumb_bend_joint', 'right_hand_thumb_rota_joint1', 'right_hand_thumb_rota_joint2', 
-                        'right_hand_index_bend_joint', 'right_hand_index_joint1', 'right_hand_index_joint2',
-                        'right_hand_mid_joint1', 'right_hand_mid_joint2',
-                        'right_hand_ring_joint1', 'right_hand_ring_joint2',
-                        'right_hand_pinky_joint1', 'right_hand_pinky_joint2'
+    'right_hand_index_bend_joint', 'right_hand_index_joint1', 'right_hand_index_joint2',
+    'right_hand_mid_joint1', 'right_hand_mid_joint2',
+    'right_hand_ring_joint1', 'right_hand_ring_joint2',
+    'right_hand_pinky_joint1', 'right_hand_pinky_joint2'
 ]
+
+ROBOTERAX_LEFT_JOINT_ORDER = [
+    'left_hand_thumb_bend_joint', 'left_hand_thumb_rota_joint1', 'left_hand_thumb_rota_joint2', 
+    'left_hand_index_bend_joint', 'left_hand_index_joint1', 'left_hand_index_joint2',
+    'left_hand_mid_joint1', 'left_hand_mid_joint2',
+    'left_hand_ring_joint1', 'left_hand_ring_joint2',
+    'left_hand_pinky_joint1', 'left_hand_pinky_joint2'
+]
+
+
+ROBOTERAX_JOINT_ORDER = ROBOTERAX_RIGHT_JOINT_ORDER
 
 
 OPERATOR2MANO_RIGHT = np.array(
@@ -103,12 +115,12 @@ OPERATOR2MANO_LEFT = np.array(
 
 def load_finger_config():
     """
-    加载手指配置信息
+    Load finger configuration information
     
     Returns:
-        字典，包含关节映射和可视化设置
+        Dictionary containing joint mapping and visualization settings
     """
-    # 默认配置
+    # Default configuration
     config = {
         "joint_mapping": {
             "thumb_end": 3,
@@ -214,24 +226,24 @@ def visualize_hand_joints(scene, joint_positions, fingertip_positions, hand_type
         # Create render material with color
         material = sapien.render.RenderMaterial()
         
-        # 为不同的手指关节设置不同的颜色
-        # 根据关节索引确定是哪个手指的关节
-        if i == 0:  # 手腕
-            material.base_color = [0.5, 0.5, 0.5, 1.0]  # 灰色
-        elif i in [1, 2, 3, 4]:  # 拇指关节
-            material.base_color = [1.0, 0.2, 0.2, 1.0]  # 红色
-        elif i in [5, 6, 7, 8]:  # 食指关节
-            material.base_color = [0.2, 1.0, 0.2, 1.0]  # 绿色
-        elif i in [9, 10, 11, 12]:  # 中指关节
-            material.base_color = [0.2, 0.2, 1.0, 1.0]  # 蓝色
-        elif i in [13, 14, 15, 16]:  # 无名指关节
-            material.base_color = [1.0, 1.0, 0.2, 1.0]  # 黄色
-        elif i in [17, 18, 19, 20]:  # 小指关节
-            material.base_color = [1.0, 0.2, 1.0, 1.0]  # 紫色
+        # Set different colors for different finger joints
+        # Determine which finger the joint belongs to based on index
+        if i == 0:  # Wrist
+            material.base_color = [0.5, 0.5, 0.5, 1.0]  # Gray
+        elif i in [1, 2, 3, 4]:  # Thumb joints
+            material.base_color = [1.0, 0.2, 0.2, 1.0]  # Red
+        elif i in [5, 6, 7, 8]:  # Index joints
+            material.base_color = [0.2, 1.0, 0.2, 1.0]  # Green
+        elif i in [9, 10, 11, 12]:  # Middle joints
+            material.base_color = [0.2, 0.2, 1.0, 1.0]  # Blue
+        elif i in [13, 14, 15, 16]:  # Ring joints
+            material.base_color = [1.0, 1.0, 0.2, 1.0]  # Yellow
+        elif i in [17, 18, 19, 20]:  # Pinky joints
+            material.base_color = [1.0, 0.2, 1.0, 1.0]  # Purple
         else:
-            material.base_color = [0.7, 0.7, 0.7, 1.0]  # 默认灰色
+            material.base_color = [0.7, 0.7, 0.7, 1.0]  # Default gray
         
-        # 调整关节大小，让指尖更明显
+        # Adjust joint size to make fingertips more visible
         radius = joint_radius
             
         builder.add_sphere_visual(radius=radius, material=material)
@@ -391,46 +403,57 @@ class HandRetargetNode(Node):
         hand_type="right",
         retargeting_type="dexpilot",
         sim_vis=False,
+        disable_collision=False,
+        is_second_hand=False,  # Whether this is the second hand
+        topic=None,  # Custom topic name
     ):
-        super().__init__("hand_retarget_node")
+        # Create different node name for second hand
+        node_name = "hand_retarget_node"
+        if is_second_hand:
+            node_name = f"hand_retarget_node_{hand_type}"
+            
+        super().__init__(node_name)
 
         self.hand_type = hand_type
         self.robot_name = robot_name
+        self.disable_collision = disable_collision
+        self.is_second_hand = is_second_hand
+        self.sim_vis = sim_vis
         
-        # 将字符串转换为枚举值
+        # Convert strings to enum values
         robot_name_enum = RobotName[robot_name]
         hand_type_enum = HandType[hand_type]
         retargeting_type_enum = RetargetingType[retargeting_type]
         
         self.get_logger().info(
-            f"使用机器人: {robot_name_enum}, 手型: {hand_type_enum}, 重定向类型: {retargeting_type_enum}"
+            f"Using robot: {robot_name_enum}, hand type: {hand_type_enum}, retargeting type: {retargeting_type_enum}"
         )
         
-        # 创建消息队列
+        # Create message queue
         self.marker_queue = multiprocessing.Queue(maxsize=1000)
         
-        # 查找机器人配置目录
+        # Find robot configuration directory
         robot_config_path = Path(__file__).parent.parent.parent / "lib" / "dex-urdf" / "robots" / "hands"
         
-        # 如果目录不存在，尝试其他路径
+        # If directory doesn't exist, try other paths
         if not robot_config_path.exists():
             robot_config_path = Path("/home/wind/ros2_ws/src/dex_retarget_wrapper_ros2_py/lib/dex-urdf/robots/hands")
             if not robot_config_path.exists():
-                self.get_logger().error(f"找不到机器人配置目录: {robot_config_path}")
-                raise ValueError(f"找不到机器人配置目录")
+                self.get_logger().error(f"Cannot find robot configuration directory: {robot_config_path}")
+                raise ValueError(f"Cannot find robot configuration directory")
         
-        self.get_logger().info(f"使用机器人配置路径: {robot_config_path}")
+        self.get_logger().info(f"Using robot configuration path: {robot_config_path}")
         
-        # 设置默认URDF目录
+        # Set default URDF directory
         RetargetingConfig.set_default_urdf_dir(str(robot_config_path))
         
-        # 使用枚举值获取配置文件路径
+        # Get configuration file path using enum values
         config_path = get_default_config_path(
             robot_name_enum, retargeting_type_enum, hand_type_enum
         )
-        self.get_logger().info(f"使用配置文件: {config_path}")
+        self.get_logger().info(f"Using configuration file: {config_path}")
         
-        # 启动重定向处理进程
+        # Start retargeting process
         self.consumer_process = multiprocessing.Process(
             target=self.start_retargeting,
             args=(
@@ -438,74 +461,109 @@ class HandRetargetNode(Node):
                 str(robot_config_path),
                 str(config_path),
                 self.hand_type,
+                disable_collision,
+                self.sim_vis,
             ),
         )
         self.consumer_process.daemon = True
         self.consumer_process.start()
         
-        # 创建手部运动学标记的订阅者
+        # Create subscriber for hand kinematics markers
+        marker_topic_name = topic if topic else "/hand_kinematics_markers"
+            
         self.marker_sub = self.create_subscription(
-            MarkerArray, "/hand_kinematics_markers", self.marker_callback, 1
+            MarkerArray, marker_topic_name, self.marker_callback, 1
         )
+        self.get_logger().info(f"Subscribed to marker topic: {marker_topic_name}")
 
-        # 创建重定向关节位置的发布者
+        # Create publisher for retargeted joint positions
+        pub_topic = "/retargeted_qpos"
+        if hand_type.lower() == "left":
+            pub_topic = "/left_retargeted_qpos"
+        elif hand_type.lower() == "right":
+            pub_topic = "/right_retargeted_qpos"
+            
         self.retargeted_pub = self.create_publisher(
-            Float32MultiArray, "/retargeted_qpos", 1
+            Float32MultiArray, pub_topic, 1
         )
-        self.get_logger().info("手部重定向节点已初始化")
+        self.get_logger().info("Hand retargeting node initialized")
 
     def marker_callback(self, msg):
-        # 检查标记数组是否为空
+        # Check if marker array is empty
         if not msg.markers:
-            self.get_logger().warn("接收到空标记数组")
+            self.get_logger().warn("Received empty marker array")
             return
 
-        # 将标记数据放入队列
-        self.marker_queue.put(msg)
+        # Filter markers based on hand type
+        filtered_markers = MarkerArray()
+        
+        # Get the namespace from the first marker
+        if msg.markers and hasattr(msg.markers[0], 'ns'):
+            namespace = msg.markers[0].ns
+            
+            # Check if this is the correct hand type
+            is_left_hand = "left" in namespace.lower()
+            is_right_hand = "right" in namespace.lower()
+            
+            # Only process markers for the correct hand
+            if (self.hand_type.lower() == "left" and is_left_hand) or (self.hand_type.lower() == "right" and is_right_hand):
+                filtered_markers = msg
+                self.get_logger().debug(f"Processing {self.hand_type} hand markers, namespace: {namespace}")
+            else:
+                # Skip markers for the wrong hand
+                return
+        else:
+            # If no namespace, process all markers
+            filtered_markers = msg
+            
+        # Put marker data into queue
+        self.marker_queue.put(filtered_markers)
         self.get_logger().debug(
-            f"已将标记数据放入队列，当前队列大小: {self.marker_queue.qsize()}"
+            f"Marker data put into queue, current queue size: {self.marker_queue.qsize()}"
         )
 
-    def start_retargeting(self, queue, robot_dir, config_path, hand_type):
+    def start_retargeting(self, queue, robot_dir, config_path, hand_type, disable_collision=False, sim_vis=False):
         """
-        在单独的进程中运行重定向处理
+        Run retargeting process in a separate process
         
         Args:
-            queue: 用于接收标记数据的队列
-            robot_dir: 机器人配置目录
-            config_path: 重定向配置文件路径
-            hand_type: 手型（"left"或"right"）
+            queue: Queue for receiving marker data
+            robot_dir: Robot configuration directory
+            config_path: Retargeting configuration file path
+            hand_type: Hand type ("left" or "right")
+            disable_collision: Whether to disable collision detection to avoid STL warnings
+            sim_vis: Whether to enable simulation visualization
         """
-        logger.info(f"启动重定向处理进程，配置文件: {config_path}, 手型: {hand_type}")
+        logger.info(f"Starting retargeting process, config file: {config_path}, hand type: {hand_type}")
         
-        # 设置URDF目录
+        # Set URDF directory
         robot_dir = Path(robot_dir)
         RetargetingConfig.set_default_urdf_dir(str(robot_dir))
         
         try:
-            # 加载配置并构建重定向器
+            # Load configuration and build retargeter
             config = RetargetingConfig.load_from_file(config_path)
             
-            # 确保type是小写的
+            # Ensure type is lowercase
             if hasattr(config, "type") and isinstance(config.type, str):
                 config.type = config.type.lower()
                 
-            # 构建重定向器
+            # Build retargeter
             retargeting = config.build()
-            logger.info("成功构建重定向器")
+            logger.info("Successfully built retargeter")
             
         except Exception as e:
-            logger.error(f"加载配置或构建重定向器失败: {e}")
+            logger.error(f"Failed to load config or build retargeter: {e}")
             raise
             
-        # 设置SAPIEN渲染器
+        # Set up SAPIEN renderer
         try:
             sapien.render.set_viewer_shader_dir("default")
             sapien.render.set_camera_shader_dir("default")
         except Exception as e:
-            logger.warning(f"设置SAPIEN渲染器时出错，这可能不影响功能: {e}")
+            logger.warning(f"Error setting SAPIEN renderer, this might not affect functionality: {e}")
             
-        # 创建场景
+        # Create scene
         scene = sapien.Scene()
         render_mat = sapien.render.RenderMaterial()
         render_mat.base_color = [0.06, 0.08, 0.12, 1]
@@ -514,7 +572,7 @@ class HandRetargetNode(Node):
         render_mat.specular = 0.8
         scene.add_ground(-0.2, render_material=render_mat, render_half_size=[1000, 1000])
 
-        # 设置光照
+        # Set up lighting
         scene.add_directional_light(np.array([1, 1, -1]), np.array([3, 3, 3]))
         scene.add_point_light(np.array([2, 2, 2]), np.array([2, 2, 2]), shadow=False)
         scene.add_point_light(np.array([2, -2, 2]), np.array([2, 2, 2]), shadow=False)
@@ -525,36 +583,40 @@ class HandRetargetNode(Node):
             sapien.Pose([2, 1, 2], [0.707, 0, 0.707, 0]), np.array([1, 1, 1]), 5, 5
         )
 
-        # 设置相机
+        # Set up camera
         cam = scene.add_camera(
             name="main_camera", width=600, height=600, fovy=1, near=0.1, far=10
         )
         cam.set_local_pose(sapien.Pose([0.50, 0, 0.0], [0, 0, 0, -1]))
 
-        # 设置查看器
+        # Set up viewer
         viewer = Viewer()
         viewer.set_scene(scene)
         viewer.control_window.show_origin_frame = False
         viewer.control_window.move_speed = 0.01
         viewer.control_window.toggle_camera_lines(False)
         viewer.set_camera_pose(cam.get_local_pose())
+        
+        # If sim_vis is disabled, hide the viewer window
+        if not sim_vis:
+            viewer.hide_window()
 
-        # 加载机器人
+        # Load robot
         loader = scene.create_urdf_loader()
         filepath = Path(config.urdf_path)
-        logger.info(f"使用URDF文件: {filepath}")
+        logger.info(f"Using URDF file: {filepath}")
         
-        # 检查文件是否存在
+        # Check if file exists
         if not os.path.exists(filepath):
-            logger.error(f"找不到URDF文件: {filepath}")
-            raise FileNotFoundError(f"找不到URDF文件: {filepath}")
+            logger.error(f"URDF file not found: {filepath}")
+            raise FileNotFoundError(f"URDF file not found: {filepath}")
             
-        # 获取机器人名称
+        # Get robot name
         robot_name = filepath.stem
-        logger.info(f"从文件路径获取的机器人名称: {robot_name}")
+        logger.info(f"Robot name obtained from file path: {robot_name}")
         loader.load_multiple_collisions_from_file = True
 
-        # 根据机器人类型设置缩放比例
+        # Set scale based on robot type
         if "ability" in robot_name:
             loader.scale = 1.5
         elif "dclaw" in robot_name:
@@ -570,20 +632,20 @@ class HandRetargetNode(Node):
         elif "svh" in robot_name:
             loader.scale = 1.5
         elif "roboterax" in robot_name:
-            loader.scale = 1.0  # 根据Roboterax的实际大小调整
+            loader.scale = 1.0  # Adjust based on actual Roboterax size
 
-        # 特殊处理文件路径
+        # Special file path handling
         if "glb" not in robot_name and not robot_name.startswith("inspire"):
             filepath = str(filepath).replace(".urdf", "_glb.urdf")
-            logger.info(f"应用_glb后缀: {filepath}")
+            logger.info(f"Applying _glb suffix: {filepath}")
         else:
             filepath = str(filepath)
-            logger.info(f"使用原始文件路径: {filepath}")
+            logger.info(f"Using original file path: {filepath}")
             
-        # 加载机器人
+        # Load robot
         robot = loader.load(filepath)
 
-        # 根据机器人类型设置姿势
+        # Set pose based on robot type
         if "ability" in robot_name:
             robot.set_pose(sapien.Pose([0, 0, -0.15]))
         elif "shadow" in robot_name:
@@ -599,91 +661,96 @@ class HandRetargetNode(Node):
         elif "svh" in robot_name:
             robot.set_pose(sapien.Pose([0, 0, -0.13]))
         elif "roboterax" in robot_name:
-            robot.set_pose(sapien.Pose([0, 0, 0]))  # 根据Roboterax的实际情况调整
+            robot.set_pose(sapien.Pose([0, 0, 0]))  # Adjust based on actual Roboterax size
         else:
-            robot.set_pose(sapien.Pose([0, 0, 0]))  # 默认
+            robot.set_pose(sapien.Pose([0, 0, 0]))  # Default
 
-        # 获取关节名称
+        # Get joint names
         retargeting_joint_names = retargeting.joint_names if hasattr(retargeting, "joint_names") else []
             
-        # 获取SAPIEN关节名称
+        # Get SAPIEN joint names
         sapien_joint_names = [joint.get_name() for joint in robot.get_active_joints()]
         
-        # 设置从重定向到SAPIEN的映射
+        # Set mapping from retargeting to SAPIEN
         retargeting_to_sapien = np.array(
             [retargeting_joint_names.index(name) for name in sapien_joint_names]
         ).astype(int)
         
-        # 设置从重定向到机器人的映射
+        # Set mapping from retargeting to robot
         if self.robot_name == "inspire":
             retargeting_to_robot = np.array(
                 [retargeting_joint_names.index(name) for name in INSPIRE_JOINT_ORDER]
             ).astype(int)
         elif self.robot_name == "roboterax":
-            retargeting_to_robot = np.array(
-                [retargeting_joint_names.index(name) for name in ROBOTERAX_JOINT_ORDER]
-            ).astype(int)
+            if self.hand_type == "right":
+                retargeting_to_robot = np.array(
+                    [retargeting_joint_names.index(name) for name in ROBOTERAX_RIGHT_JOINT_ORDER]
+                ).astype(int)
+            elif self.hand_type == "left":
+                retargeting_to_robot = np.array(
+                    [retargeting_joint_names.index(name) for name in ROBOTERAX_LEFT_JOINT_ORDER]
+                ).astype(int)
         else:
             retargeting_to_robot = np.array(
                 [retargeting_joint_names.index(name) for name in retargeting_joint_names]
             ).astype(int)
 
-        # 创建ROS2节点用于发布重定向的关节位置
+        # Create ROS2 node for publishing retargeted joint positions
         ros_context = rclpy.Context()
         ros_context.init()
         ros_node = rclpy.create_node("retargeting_publisher", context=ros_context)
         retargeted_pub = ros_node.create_publisher(Float32MultiArray, "/retargeted_qpos", 1)
         
-        # 主循环
+        # Main loop
         while True:
             try:
-                # 从队列获取标记数据，超时5秒
+                # Get marker data from queue, timeout 5 seconds
                 msg = queue.get(timeout=5)
                 
-                # 处理标记数据
+                # Process marker data
                 joint_pos, joint_ori = process_hand_marker_array(msg, hand_type=hand_type)
                 
-                # 对关节点坐标进行放缩和偏移来微调重定向效果
+                # Scale and offset joint positions to fine-tune retargeting effect
                 if joint_pos is not None:
-                    # 定义缩放因子和偏移量（可以根据需要调整）
+                    # Define scale factors and offsets (can be adjusted as needed)
                     scale_factors = {
-                        'global': 1.3,  # 全局缩放因子
-                        'thumb': 1.0,   # 拇指缩放因子
-                        'index': 1.0,   # 食指缩放因子
-                        'middle': 1.0,  # 中指缩放因子
-                        'ring': 1.0,    # 无名指缩放因子
-                        'pinky': 1.0    # 小指缩放因子
+                        'global': 1.3,  # Global scale factor
+                        'thumb': 1.0,   # Thumb scale factor
+                        'index': 1.0,   # Index scale factor
+                        'middle': 1.0,  # Middle scale factor
+                        'ring': 1.0,    # Ring scale factor
+                        'pinky': 1.0    # Pinky scale factor
                     }
                     
-                    # 定义关节组
+                    # Define joint groups
                     joint_groups = {
-                        'thumb': [1, 2, 3, 4],    # 拇指关节索引
-                        'index': [5, 6, 7, 8],    # 食指关节索引
-                        'middle': [9, 10, 11, 12], # 中指关节索引
-                        'ring': [13, 14, 15, 16],  # 无名指关节索引
-                        'pinky': [17, 18, 19, 20]  # 小指关节索引
+                        'thumb': [1, 2, 3, 4],    # Thumb joint indices
+                        'index': [5, 6, 7, 8],    # Index joint indices
+                        'middle': [9, 10, 11, 12], # Middle joint indices
+                        'ring': [13, 14, 15, 16],  # Ring joint indices
+                        'pinky': [17, 18, 19, 20]  # Pinky joint indices
                     }
                     
-                    # 全局缩放
+                    # Global scaling
                     joint_pos = joint_pos * scale_factors['global']
                     
-                    # 对每个手指单独缩放
+                    # Scale each finger individually
                     for finger, indices in joint_groups.items():
-                        # 确保索引在有效范围内
+                        # Ensure indices are within valid range
                         valid_indices = [idx for idx in indices if idx < joint_pos.shape[0]]
                         if valid_indices:
-                            # 获取手腕位置作为基准点
+                            # Get wrist position as reference point
                             wrist_pos = joint_pos[0] if joint_pos.shape[0] > 0 else np.zeros(3)
                             
                             for idx in valid_indices:
-                                # 计算相对于手腕的位置
+                                # Calculate relative position
                                 rel_pos = joint_pos[idx] - wrist_pos
-                                # 应用缩放
+                                # Apply scaling
                                 scaled_rel_pos = rel_pos * scale_factors[finger]
-                                # 更新关节位置
+                                # Update joint position
                                 joint_pos[idx] = wrist_pos + scaled_rel_pos
                 
-                # 使用重定向逻辑处理关节位置
+                # Use retargeting logic to process joint positions
                 retargeting_type = retargeting.optimizer.retargeting_type
                 indices = retargeting.optimizer.target_link_human_indices
                 
@@ -696,37 +763,37 @@ class HandRetargetNode(Node):
                     
                 qpos = retargeting.retarget(ref_value)
                 
-                # 设置机器人姿势
+                # Set robot pose
                 robot.set_qpos(qpos[retargeting_to_sapien])
                 
-                # 获取机器人手指关节的位置（通过正向运动学）
+                # Get robot finger joint positions (through forward kinematics)
                 robot_joints = robot.get_active_joints()
                 robot_joint_positions = []
                 robot_joint_names = []
                 
-                # 收集机器人关节位置和名称
+                # Collect robot joint positions and names
                 for joint in robot_joints:
-                    # 获取关节在世界坐标系中的位置
+                    # Get position of joint in world coordinates
                     link = joint.get_child_link()
                     if link:
                         pos = link.get_pose().p
                         robot_joint_positions.append(pos)
                         robot_joint_names.append(joint.get_name())
                 
-                # # 打印调试信息
-                # logger.info(f"机器人关节数量: {len(robot_joint_positions)}")
+                # # Print debug information
+                # logger.info(f"Robot joint count: {len(robot_joint_positions)}")
                 # if robot_joint_positions:
-                #     logger.info(f"机器人关节名称: {robot_joint_names}")
+                #     logger.info(f"Robot joint names: {robot_joint_names}")
                 
-                # 可视化手指关节
-                # 获取手掌位置和手指关节位置
+                # Visualize finger joints
+                # Get palm position and finger joint positions
                 if joint_pos is not None and len(joint_pos) > 0:
-                    # 创建指尖位置字典
+                    # Create fingertip position dictionary
                     fingertip_positions = {}
                     finger_config = load_finger_config()
                     joint_mapping = finger_config["joint_mapping"]
                     
-                    # 如果有足够的关节点，添加指尖位置
+                    # If enough joint points, add fingertip positions
                     if len(joint_pos) > max(joint_mapping.values()):
                         fingertip_positions = {
                             'thumb': joint_pos[joint_mapping["thumb_end"]],
@@ -736,7 +803,7 @@ class HandRetargetNode(Node):
                             'pinky': joint_pos[joint_mapping["pinky_end"]]
                         }
                     
-                    # 可视化人手关节点（输入）
+                    # Visualize human hand joint points (input)
                     name_prefix = f"{hand_type}_human_hand_"
                     visualize_hand_joints(
                         scene, 
@@ -746,18 +813,18 @@ class HandRetargetNode(Node):
                         joint_orientations=joint_ori if 'joint_ori' in locals() else None,
                         finger_config=finger_config,
                         name_prefix=name_prefix,
-                        position_offset=[0, 0, 0]  # 向右偏移一点，避免与机器人手重叠
+                        position_offset=[0, 0, 0]  # Shift right a bit to avoid overlap with robot hand
                     )
                     
-                    # 可视化机器人手关节点（输出）
+                    # Visualize robot hand joint points (output)
                     if robot_joint_positions:
-                        # 转换为numpy数组
+                        # Convert to numpy array
                         robot_joints_np = np.array(robot_joint_positions)
                         
-                        # 创建机器人指尖位置字典（简化版，仅用于演示）
+                        # Create robot fingertip position dictionary (simplified, for demonstration)
                         robot_fingertips = {}
                         
-                        # 尝试找到机器人手的指尖关节
+                        # Try to find robot hand fingertip joints
                         for i, name in enumerate(robot_joint_names):
                             if "thumb" in name.lower() and "tip" in name.lower():
                                 robot_fingertips["thumb"] = robot_joint_positions[i]
@@ -770,7 +837,7 @@ class HandRetargetNode(Node):
                             elif "pinky" in name.lower() and "tip" in name.lower():
                                 robot_fingertips["pinky"] = robot_joint_positions[i]
                         
-                        # 可视化机器人手关节
+                        # Visualize robot hand joints
                         robot_name_prefix = f"{hand_type}_robot_hand_"
                         visualize_hand_joints(
                             scene, 
@@ -779,54 +846,54 @@ class HandRetargetNode(Node):
                             hand_type=hand_type,
                             finger_config=finger_config,
                             name_prefix=robot_name_prefix,
-                            position_offset=[0, 0, 0]  # 不需要偏移，使用机器人的实际位置
+                            position_offset=[0, 0, 0]  # No offset, use actual robot position
                         )
 
-                # 渲染场景
+                # Render scene
                 for _ in range(2):
                     viewer.render()
                 
-                # 发布重定向的关节位置
+                # Publish retargeted joint positions
                 retargeted_msg = Float32MultiArray()
                 retargeted_msg.data = qpos[retargeting_to_robot].flatten().tolist()
                 retargeted_pub.publish(retargeted_msg)
 
-                # 处理ROS2事件
+                # Process ROS2 events
                 rclpy.spin_once(ros_node, timeout_sec=0.001)
                 
             except Empty:
-                logger.warning("5秒内未收到标记数据")
+                logger.warning("No marker data received within 5 seconds")
                 continue
             except KeyboardInterrupt:
-                logger.info("接收到中断信号，退出重定向进程")
+                logger.info("Received interrupt signal, exiting retargeting process")
                 break
             except Exception as e:
-                # 记录错误但继续运行，除非是致命错误
-                logger.error(f"处理标记数据时出错: {e}")
+                # Log error but continue, unless it's a fatal error
+                logger.error(f"Error processing marker data: {e}")
                 if isinstance(e, (ValueError, AttributeError, IndexError, TypeError)):
-                    # 这些错误可能是暂时的，继续运行
+                    # These errors might be temporary, continue
                     continue
                 else:
-                    # 其他错误可能更严重，抛出异常
-                    logger.critical(f"遇到致命错误，退出进程: {e}")
+                    # Other errors might be more severe, raise exception
+                    logger.critical(f"Encountered fatal error, exiting process: {e}")
                     raise
         
-        # 清理资源
+        # Clean up resources
         ros_node.destroy_node()
         ros_context.shutdown()
 
     def destroy_node(self):
-        # 终止重定向处理进程
+        # Terminate retargeting process
         if hasattr(self, "consumer_process") and self.consumer_process.is_alive():
             self.consumer_process.terminate()
             self.consumer_process.join(timeout=1.0)
-            self.get_logger().info("已终止重定向处理进程")
+            self.get_logger().info("Retargeting process terminated")
 
         super().destroy_node()
 
 
 def main(args=None):
-    # 解析命令行参数
+    # Parse command line arguments
     parser = argparse.ArgumentParser(description="Hand Retargeting Node")
     parser.add_argument(
         "--robot-name",
@@ -857,40 +924,87 @@ def main(args=None):
         action="store_true",
         help="Enable simulation visualization",
     )
+    parser.add_argument(
+        "--dual-hands",
+        action="store_true",
+        help="Display both left and right hands simultaneously",
+    )
+    parser.add_argument(
+        "--topic",
+        type=str,
+        default="/hand_kinematics_markers",
+        help="Topic to subscribe for hand kinematics markers",
+    )
+    parser.add_argument(
+        "--disable-collision",
+        action="store_true",
+        help="Disable collision detection to avoid STL warnings",
+    )
 
-    # 解析参数
+    # Parse arguments
     args, unknown = parser.parse_known_args()
 
-    # 打印所有可用的机器人名称
-    print("可用的机器人名称:")
+    # Print all available robot names
+    print("Available robot names:")
     available_robots = [name for name in RobotName.__members__]
     print(available_robots)
     
-    # 检查用户指定的机器人名称是否在可用列表中
+    # Check if user-specified robot name is in the available list
     if args.robot_name not in available_robots:
-        print(f"警告: 机器人名称 '{args.robot_name}' 不在可用列表中")
+        print(f"Warning: Robot name '{args.robot_name}' is not in the available list")
 
-    # 初始化ROS2
+    # Initialize ROS2
     rclpy.init(args=unknown)
 
     try:
-        # 创建并运行节点
+        # Create and run node
         node = HandRetargetNode(
             robot_name=args.robot_name,
             hand_type=args.hand_type.lower(),
             retargeting_type=args.retargeting_type.lower(),
             sim_vis=args.sim_vis,
+            topic=args.topic,
         )
-        rclpy.spin(node)
+        # 如果启用了双手模式，创建第二个手的节点
+        second_node = None
+        if args.dual_hands:
+            # 如果当前是左手，则第二个是右手，反之亦然
+            second_hand_type = "right" if args.hand_type.lower() == "left" else "left"
+            print(f"Dual-hand mode: Creating second hand ({second_hand_type})")
+            
+            # 检查disable_collision参数是否存在
+            disable_collision = False
+            if hasattr(args, 'disable_collision'):
+                disable_collision = args.disable_collision
+                
+            second_node = HandRetargetNode(
+                robot_name=args.robot_name,
+                hand_type=second_hand_type,
+                retargeting_type=args.retargeting_type.lower(),
+                sim_vis=args.sim_vis,
+                disable_collision=disable_collision,
+                is_second_hand=True,
+                topic=args.topic,
+            )
+            
+        # 使用MultiThreadedExecutor同时运行两个节点
+        if second_node:
+            from rclpy.executors import MultiThreadedExecutor
+            executor = MultiThreadedExecutor(num_threads=2)
+            executor.add_node(node)
+            executor.add_node(second_node)
+            executor.spin()
+        else:
+            rclpy.spin(node)
     except KeyboardInterrupt:
-        print("接收到中断信号，退出节点")
+        print("Received interrupt signal, exiting node")
     except Exception as e:
-        print(f"运行节点时出错: {e}")
-        # 打印更详细的错误信息
+        print(f"Error running node: {e}")
+        # Print more detailed error information
         import traceback
         traceback.print_exc()
     finally:
-        # 清理资源
+        # Clean up resources
         if 'node' in locals():
             node.destroy_node()
         rclpy.shutdown()
