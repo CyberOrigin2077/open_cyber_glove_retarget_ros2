@@ -71,7 +71,7 @@ ros2 run cyber_retarget_ros2_py retarget_node --robot-name roboterax --hand-type
 
 #### Dual Hand Retargeting
 ```bash
-ros2 run cyber_retarget_ros2_py retarget_node --robot-name roboterax --hand-type right --sim-vis --dual-hands
+ros2 run cyber_retarget_ros2_py retarget_node --robot-name roboterax --dual-hands --sim-vis
 ```
 
 #### Custom Topic
@@ -96,22 +96,38 @@ ros2 run cyber_retarget_ros2_py retarget_node --robot-name roboterax --hand-type
 
 ## 4. Dual-Hand Mode
 
-The node supports simultaneous retargeting of both left and right hands. When the `--dual-hands` parameter is used, the node creates two separate instances:
-- One for the left hand
-- One for the right hand
+The node supports simultaneous retargeting of both left and right hands. When the `--dual-hands` parameter is used, the node creates a unified dual-hand retargeting instance that:
 
-Each instance subscribes to the same topic (`/hand_kinematics_markers` by default) but filters the markers based on their namespace to get the correct hand data.
+- Loads both left and right hand models in the same SAPIEN scene
+- Processes both hands' marker data simultaneously
+- Applies hand joint scaling to both hands independently
+- Visualizes both hands in a single window with optimized camera view
+- Publishes to both `/left_retargeted_qpos` and `/right_retargeted_qpos` topics
 
-## 5. Visualization
+## 5. Hand Joint Scaling
+
+Both single-hand and dual-hand modes support hand joint scaling to fine-tune the retargeting effect:
+
+- Global scaling factor: 1.3 (scales the entire hand)
+- Individual finger scaling:
+  - Thumb: 1.0
+  - Index: 1.0
+  - Middle: 1.0
+  - Ring: 1.0
+  - Pinky: 1.0
+
+These scaling factors can be adjusted in the code to achieve different retargeting effects. The scaling is applied to the joint positions relative to the wrist, preserving the wrist position while scaling the finger movements.
+
+## 6. Visualization
 
 When the `--sim-vis` parameter is used, the node creates a SAPIEN visualization window showing:
-- The robot hand model
+- The robot hand model(s)
 - The human hand joint positions
 - The retargeted robot joint positions
 
-In dual-hand mode, both hands are visualized in the same window.
+In dual-hand mode, both hands are visualized in the same window with an optimized camera view.
 
-## 6. Troubleshooting
+## 7. Troubleshooting
 
 ### STL File Warnings
 If you see warnings about "loading multiple convex collision meshes from STL file", you can use the `--disable-collision` parameter to disable collision detection and suppress these warnings.
@@ -123,10 +139,10 @@ ros2 topic info /hand_kinematics_markers
 ```
 
 ### Integration with Glove Visualizer
-This node is designed to work with the `glove_visualizer` package, which publishes hand kinematics data to the `/hand_kinematics_markers` topic. Make sure the `hand_display_node` from that package is running:
+This node is designed to work with the `glove_visualizer` package, which publishes hand kinematics data to the `/hand_kinematics_markers` topic. Make sure the `hand_display_node` from that package is running.
 
-## 4. Additional Notes
-- If you want to enable simulation visualization, make sure you have a working SAPIEN installation and set `sim_vis=True` in the code or modify the launch command accordingly.
+## 8. Additional Notes
+- If you want to enable simulation visualization, make sure you have a working SAPIEN installation and use the `--sim-vis` flag.
 - For more details on configuration files and supported robots, refer to the [dex-realtime-retargeting documentation](https://github.com/CyberOrigin2077/dex_realtime_retargeting).
 
 ---
