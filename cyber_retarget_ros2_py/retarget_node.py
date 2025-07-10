@@ -1083,10 +1083,6 @@ class DualHandRetargetNode(Node):
         cam = scene.add_camera(
             name="main_camera", width=800, height=600, fovy=1, near=0.1, far=10
         )
-        # 根据新的机器人手位置调整摄像机视角
-        # 左手位置: [0, -0.2, 0]（后方），右手位置: [0, 0.2, 0]（前方）
-        # 设置摄像机在侧面观察，可以同时看到前后两个手
-        # 旋转-30度，四元数[0, -0.2588, 0, 0.9659]表示绕y轴逆时针旋转30度
         cam.set_local_pose(sapien.Pose([0.7, 0.0, 0.3], [0, -0.2588, 0, 0.9659]))  # 从侧面-30度角观察
 
         # Set up viewer
@@ -1264,24 +1260,21 @@ class DualHandRetargetNode(Node):
                     left_joint_pos, left_joint_ori = process_hand_marker_array(left_msg, hand_type="left")
                     
                     if left_joint_pos is not None:
-                        # 为左手添加缩放调整
-                        # Define scale factors and offsets (can be adjusted as needed)
                         scale_factors = {
-                            'global': 1.3,  # Global scale factor
-                            'thumb': 1.0,   # Thumb scale factor
-                            'index': 1.0,   # Index scale factor
-                            'middle': 1.0,  # Middle scale factor
-                            'ring': 1.0,    # Ring scale factor
-                            'pinky': 1.0    # Pinky scale factor
+                            'global': 1.3,
+                            'thumb': 1.0,
+                            'index': 1.0,
+                            'middle': 1.0,
+                            'ring': 1.0,
+                            'pinky': 1.0
                         }
                         
-                        # Define joint groups
                         joint_groups = {
-                            'thumb': [1, 2, 3, 4],    # Thumb joint indices
-                            'index': [5, 6, 7, 8],    # Index joint indices
-                            'middle': [9, 10, 11, 12], # Middle joint indices
-                            'ring': [13, 14, 15, 16],  # Ring joint indices
-                            'pinky': [17, 18, 19, 20]  # Pinky joint indices
+                            'thumb': [1, 2, 3, 4],
+                            'index': [5, 6, 7, 8],
+                            'middle': [9, 10, 11, 12],
+                            'ring': [13, 14, 15, 16],
+                            'pinky': [17, 18, 19, 20]
                         }
                         
                         # Global scaling
@@ -1336,24 +1329,20 @@ class DualHandRetargetNode(Node):
                     right_joint_pos, right_joint_ori = process_hand_marker_array(right_msg, hand_type="right")
                     
                     if right_joint_pos is not None:
-                        # 为右手添加缩放调整
-                        # Define scale factors and offsets (can be adjusted as needed)
                         scale_factors = {
-                            'global': 1.3,  # Global scale factor
-                            'thumb': 1.0,   # Thumb scale factor
-                            'index': 1.0,   # Index scale factor
-                            'middle': 1.0,  # Middle scale factor
-                            'ring': 1.0,    # Ring scale factor
-                            'pinky': 1.0    # Pinky scale factor
+                            'global': 1.3,
+                            'thumb': 1.0,
+                            'index': 1.0,
+                            'middle': 1.0,
+                            'ring': 1.0,
+                            'pinky': 1.0
                         }
-                        
-                        # Define joint groups
                         joint_groups = {
-                            'thumb': [1, 2, 3, 4],    # Thumb joint indices
-                            'index': [5, 6, 7, 8],    # Index joint indices
-                            'middle': [9, 10, 11, 12], # Middle joint indices
-                            'ring': [13, 14, 15, 16],  # Ring joint indices
-                            'pinky': [17, 18, 19, 20]  # Pinky joint indices
+                            'thumb': [1, 2, 3, 4],
+                            'index': [5, 6, 7, 8],
+                            'middle': [9, 10, 11, 12],
+                            'ring': [13, 14, 15, 16],
+                            'pinky': [17, 18, 19, 20]
                         }
                         
                         # Global scaling
