@@ -61,6 +61,7 @@ The node supports the following command line arguments:
 - `--dual-hands`: Display both left and right hands simultaneously
 - `--topic`: Topic to subscribe for hand kinematics markers (default: "/hand_kinematics_markers")
 - `--disable-collision`: Disable collision detection to avoid STL warnings
+- `--hide-joints`: Hide joint visualization spheres in the visualization window
 
 ### Examples
 
@@ -126,6 +127,16 @@ When the `--sim-vis` parameter is used, the node creates a SAPIEN visualization 
 - The retargeted robot joint positions
 
 In dual-hand mode, both hands are visualized in the same window with an optimized camera view.
+
+### Controlling Joint Visualization
+
+By default, both the human hand and robot hand joints are visualized as colored spheres. If you want to hide these joint spheres and fingertip indicators (for clearer visualization or performance reasons), you can use the `--hide-joints` parameter:
+
+```bash
+ros2 run cyber_retarget_ros2_py retarget_node --robot-name roboterax --dual-hands --sim-vis --hide-joints
+```
+
+This will still visualize the hand models but without the additional joint and fingertip spheres, resulting in a cleaner visualization.
 
 ## 7. Troubleshooting
 

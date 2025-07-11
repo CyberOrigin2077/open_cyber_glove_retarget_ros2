@@ -140,7 +140,7 @@ def load_finger_config():
 
 
 # Function to visualize hand joints in 3D space using SAPIEN
-def visualize_hand_joints(scene, joint_positions, fingertip_positions, hand_type="Right", joint_orientations=None, finger_config=None, position_offset=None, name_prefix=""):
+def visualize_hand_joints(scene, joint_positions, fingertip_positions, hand_type="Right", joint_orientations=None, finger_config=None, position_offset=None, name_prefix="", show_joints=True):
     """
     Visualize hand joints and fingertips in 3D space using SAPIEN
     
@@ -153,6 +153,7 @@ def visualize_hand_joints(scene, joint_positions, fingertip_positions, hand_type
         finger_config: Configuration dictionary containing joint mappings and visualization settings
         position_offset: Optional offset to apply to visualization positions [x, y, z]
         name_prefix: Prefix to add to visualization object names to differentiate left/right hands
+        show_joints: Whether to show joint visualization spheres (default: True)
     """
     # Load configuration if not provided
     if finger_config is None:
@@ -220,52 +221,53 @@ def visualize_hand_joints(scene, joint_positions, fingertip_positions, hand_type
                     logger.debug(f"Failed to remove actor {actor.name}: {e}")
     
     # Visualize joints
-    for i in range(len(joint_positions)):
-        pos = joint_positions[i] * scale_factor + pos_offset
-        builder = scene.create_actor_builder()
-        # Create render material with color
-        material = sapien.render.RenderMaterial()
-        
-        # Set different colors for different finger joints
-        # Determine which finger the joint belongs to based on index
-        if i == 0:  # Wrist
-            material.base_color = [0.5, 0.5, 0.5, 1.0]  # Gray
-        elif i in [1, 2, 3, 4]:  # Thumb joints
-            material.base_color = [1.0, 0.2, 0.2, 1.0]  # Red
-        elif i in [5, 6, 7, 8]:  # Index joints
-            material.base_color = [0.2, 1.0, 0.2, 1.0]  # Green
-        elif i in [9, 10, 11, 12]:  # Middle joints
-            material.base_color = [0.2, 0.2, 1.0, 1.0]  # Blue
-        elif i in [13, 14, 15, 16]:  # Ring joints
-            material.base_color = [1.0, 1.0, 0.2, 1.0]  # Yellow
-        elif i in [17, 18, 19, 20]:  # Pinky joints
-            material.base_color = [1.0, 0.2, 1.0, 1.0]  # Purple
-        else:
-            material.base_color = [0.7, 0.7, 0.7, 1.0]  # Default gray
-        
-        # Adjust joint size to make fingertips more visible
-        radius = joint_radius
-            
-        builder.add_sphere_visual(radius=radius, material=material)
-        joint = builder.build(name=f"{name_prefix}joint_{i}")
-        joint.set_pose(sapien.Pose(pos))
-        vis_objects.append(joint)
-    
-    # Visualize fingertips
-    for finger_name, chain in finger_chains.items():
-        if finger_name in fingertip_positions:
-            tip_pos = fingertip_positions[finger_name] * scale_factor + pos_offset
+    if show_joints:
+        for i in range(len(joint_positions)):
+            pos = joint_positions[i] * scale_factor + pos_offset
             builder = scene.create_actor_builder()
             # Create render material with color
             material = sapien.render.RenderMaterial()
-            material.base_color = finger_colors[finger_name] + [1.0]
-            builder.add_sphere_visual(radius=fingertip_radius, material=material)
-            fingertip = builder.build(name=f"{name_prefix}fingertip_{finger_name}")
-            fingertip.set_pose(sapien.Pose(tip_pos))
-            vis_objects.append(fingertip)
+            
+            # Set different colors for different finger joints
+            # Determine which finger the joint belongs to based on index
+            if i == 0:  # Wrist
+                material.base_color = [0.5, 0.5, 0.5, 1.0]  # Gray
+            elif i in [1, 2, 3, 4]:  # Thumb joints
+                material.base_color = [1.0, 0.2, 0.2, 1.0]  # Red
+            elif i in [5, 6, 7, 8]:  # Index joints
+                material.base_color = [0.2, 1.0, 0.2, 1.0]  # Green
+            elif i in [9, 10, 11, 12]:  # Middle joints
+                material.base_color = [0.2, 0.2, 1.0, 1.0]  # Blue
+            elif i in [13, 14, 15, 16]:  # Ring joints
+                material.base_color = [1.0, 1.0, 0.2, 1.0]  # Yellow
+            elif i in [17, 18, 19, 20]:  # Pinky joints
+                material.base_color = [1.0, 0.2, 1.0, 1.0]  # Purple
+            else:
+                material.base_color = [0.7, 0.7, 0.7, 1.0]  # Default gray
+            
+            # Adjust joint size to make fingertips more visible
+            radius = joint_radius
+                
+            builder.add_sphere_visual(radius=radius, material=material)
+            joint = builder.build(name=f"{name_prefix}joint_{i}")
+            joint.set_pose(sapien.Pose(pos))
+            vis_objects.append(joint)
+    
+        # Visualize fingertips
+        for finger_name, chain in finger_chains.items():
+            if finger_name in fingertip_positions:
+                tip_pos = fingertip_positions[finger_name] * scale_factor + pos_offset
+                builder = scene.create_actor_builder()
+                # Create render material with color
+                material = sapien.render.RenderMaterial()
+                material.base_color = finger_colors[finger_name] + [1.0]
+                builder.add_sphere_visual(radius=fingertip_radius, material=material)
+                fingertip = builder.build(name=f"{name_prefix}fingertip_{finger_name}")
+                fingertip.set_pose(sapien.Pose(tip_pos))
+                vis_objects.append(fingertip)
     
     # Visualize fingertip joint axes
-    if joint_orientations is not None:
+    if joint_orientations is not None and show_joints:
         # Define fingertip joints from config
         fingertip_joints = {
             'thumb': joint_mapping["thumb_end"],
@@ -406,6 +408,7 @@ class HandRetargetNode(Node):
         disable_collision=False,
         is_second_hand=False,  # Whether this is the second hand
         topic=None,  # Custom topic name
+        show_joints=True,  # Whether to show joint visualization
     ):
         # Create different node name for second hand
         node_name = "hand_retarget_node"
@@ -419,6 +422,7 @@ class HandRetargetNode(Node):
         self.disable_collision = disable_collision
         self.is_second_hand = is_second_hand
         self.sim_vis = sim_vis
+        self.show_joints = show_joints  # Store visualization control parameter
         
         # Convert strings to enum values
         robot_name_enum = RobotName[robot_name]
@@ -666,7 +670,7 @@ class HandRetargetNode(Node):
             robot.set_pose(sapien.Pose([0, 0, 0]))  # Default
 
         # Get joint names
-        retargeting_joint_names = retargeting.joint_names if hasattr(retargeting, "joint_names") else []
+        retargeting_joint_names = retargeting.joint_names
             
         # Get SAPIEN joint names
         sapien_joint_names = [joint.get_name() for joint in robot.get_active_joints()]
@@ -676,24 +680,25 @@ class HandRetargetNode(Node):
             [retargeting_joint_names.index(name) for name in sapien_joint_names]
         ).astype(int)
         
-        # Set mapping from retargeting to robot
-        if self.robot_name == "inspire":
-            retargeting_to_robot = np.array(
-                [retargeting_joint_names.index(name) for name in INSPIRE_JOINT_ORDER]
-            ).astype(int)
-        elif self.robot_name == "roboterax":
-            if self.hand_type == "right":
-                retargeting_to_robot = np.array(
-                    [retargeting_joint_names.index(name) for name in ROBOTERAX_RIGHT_JOINT_ORDER]
-                ).astype(int)
-            elif self.hand_type == "left":
-                retargeting_to_robot = np.array(
-                    [retargeting_joint_names.index(name) for name in ROBOTERAX_LEFT_JOINT_ORDER]
-                ).astype(int)
-        else:
-            retargeting_to_robot = np.array(
-                [retargeting_joint_names.index(name) for name in retargeting_joint_names]
-            ).astype(int)
+        # # Set mapping from retargeting to robot
+        # if self.robot_name == "inspire":
+        #     retargeting_to_robot = np.array(
+        #         [retargeting_joint_names.index(name) for name in INSPIRE_JOINT_ORDER]
+        #     ).astype(int)
+        # elif self.robot_name == "roboterax":
+        #     if self.hand_type == "right":
+        #         retargeting_to_robot = np.array(
+        #             [retargeting_joint_names.index(name) for name in ROBOTERAX_RIGHT_JOINT_ORDER]
+        #         ).astype(int)
+        #     elif self.hand_type == "left":
+        #         retargeting_to_robot = np.array(
+        #             [retargeting_joint_names.index(name) for name in ROBOTERAX_LEFT_JOINT_ORDER]
+        #         ).astype(int)
+        # else:
+        retargeting_to_robot = np.array(
+            [retargeting_joint_names.index(name) for name in retargeting_joint_names]
+        ).astype(int)
+        print(f"retargeting_to_robot: {retargeting_to_robot}")
 
         # Create ROS2 node for publishing retargeted joint positions
         ros_context = rclpy.Context()
@@ -719,7 +724,7 @@ class HandRetargetNode(Node):
                         'index': 1.0,   # Index scale factor
                         'middle': 1.0,  # Middle scale factor
                         'ring': 1.0,    # Ring scale factor
-                        'pinky': 1.0    # Pinky scale factor
+                        'pinky': 1.05  # Pinky scale factor
                     }
                     
                     # Define joint groups
@@ -756,12 +761,18 @@ class HandRetargetNode(Node):
                 
                 if retargeting_type == "POSITION":
                     ref_value = joint_pos[indices, :]
+                    # print(f"indices: {indices}")
                 else:
                     origin_indices = indices[0, :]
                     task_indices = indices[1, :]
                     ref_value = joint_pos[task_indices, :] - joint_pos[origin_indices, :]
+
+                    # print(f"origin_indices: {origin_indices}")
+                    # print(f"indices: {indices}")
                     
                 qpos = retargeting.retarget(ref_value)
+                # print(f"ref_value: {ref_value}")
+                # print(f"qpos: {qpos}")
                 
                 # Set robot pose
                 robot.set_qpos(qpos[retargeting_to_sapien])
@@ -813,7 +824,8 @@ class HandRetargetNode(Node):
                         joint_orientations=joint_ori if 'joint_ori' in locals() else None,
                         finger_config=finger_config,
                         name_prefix=name_prefix,
-                        position_offset=[0, 0, 0]  # Shift right a bit to avoid overlap with robot hand
+                        position_offset=[0, 0, 0],  # Shift right a bit to avoid overlap with robot hand
+                        show_joints=self.show_joints  # Pass the visualization control parameter
                     )
                     
                     # Visualize robot hand joint points (output)
@@ -846,7 +858,8 @@ class HandRetargetNode(Node):
                             hand_type=hand_type,
                             finger_config=finger_config,
                             name_prefix=robot_name_prefix,
-                            position_offset=[0, 0, 0]  # No offset, use actual robot position
+                            position_offset=[0, 0, 0],  # No offset, use actual robot position
+                            show_joints=self.show_joints  # Pass the visualization control parameter
                         )
 
                 # Render scene
@@ -900,12 +913,14 @@ class DualHandRetargetNode(Node):
         sim_vis=False,
         disable_collision=False,
         topic=None,  # Custom topic name
+        show_joints=True,  # Whether to show joint visualization
     ):
         super().__init__("dual_hand_retarget_node")
         
         self.robot_name = robot_name
         self.disable_collision = disable_collision
         self.sim_vis = sim_vis
+        self.show_joints = show_joints  # Store the visualization control parameter
         
         # Convert strings to enum values
         robot_name_enum = RobotName[robot_name]
@@ -1250,7 +1265,55 @@ class DualHandRetargetNode(Node):
         right_joint_pos = None
         right_joint_ori = None
         right_qpos = None
-        
+
+        if self.robot_name == "allegro":
+            scale_factors = {
+                'global': 1,
+                'thumb': 1.0,
+                'index': 1.0,
+                'middle': 1.0,
+                'ring': 1.0,
+                'pinky': 1.0
+            }
+            joint_groups = {
+                'thumb': [1, 2, 3, 4],
+                'index': [5, 6, 7, 8],
+                'middle': [9, 10, 11, 12],
+                'ring': [13, 14, 15, 16],
+                'pinky': [17, 18, 19, 20]
+            }
+        elif self.robot_name == "roboterax":
+            scale_factors = {
+                'global': 1.3,
+                'thumb': 1.0,
+                'index': 1.0,
+                'middle': 1.0,
+                'ring': 1.0,
+                'pinky': 1.0
+            }
+            joint_groups = {
+                'thumb': [1, 2, 3, 4],
+                'index': [5, 6, 7, 8],
+                'middle': [9, 10, 11, 12],
+                'ring': [13, 14, 15, 16],
+                'pinky': [17, 18, 19, 20]
+            }
+        else:
+            scale_factors = {
+                'global': 1.3,
+                'thumb': 1.0,
+                'index': 1.0,
+                'middle': 1.0,
+                'ring': 1.0,
+                'pinky': 1.0
+            }
+            joint_groups = {
+                'thumb': [1, 2, 3, 4],
+                'index': [5, 6, 7, 8],
+                'middle': [9, 10, 11, 12],
+                'ring': [13, 14, 15, 16],
+                'pinky': [17, 18, 19, 20]
+            }
         # Main loop
         while True:
             try:
@@ -1260,23 +1323,6 @@ class DualHandRetargetNode(Node):
                     left_joint_pos, left_joint_ori = process_hand_marker_array(left_msg, hand_type="left")
                     
                     if left_joint_pos is not None:
-                        scale_factors = {
-                            'global': 1.3,
-                            'thumb': 1.0,
-                            'index': 1.0,
-                            'middle': 1.0,
-                            'ring': 1.0,
-                            'pinky': 1.0
-                        }
-                        
-                        joint_groups = {
-                            'thumb': [1, 2, 3, 4],
-                            'index': [5, 6, 7, 8],
-                            'middle': [9, 10, 11, 12],
-                            'ring': [13, 14, 15, 16],
-                            'pinky': [17, 18, 19, 20]
-                        }
-                        
                         # Global scaling
                         left_joint_pos = left_joint_pos * scale_factors['global']
                         
@@ -1308,6 +1354,7 @@ class DualHandRetargetNode(Node):
                             left_ref_value = left_joint_pos[left_task_indices, :] - left_joint_pos[left_origin_indices, :]
                             
                         left_qpos = left_retargeting.retarget(left_ref_value)
+
                         
                         # Set robot pose
                         left_robot.set_qpos(left_qpos[left_retargeting_to_sapien])
@@ -1329,22 +1376,6 @@ class DualHandRetargetNode(Node):
                     right_joint_pos, right_joint_ori = process_hand_marker_array(right_msg, hand_type="right")
                     
                     if right_joint_pos is not None:
-                        scale_factors = {
-                            'global': 1.3,
-                            'thumb': 1.0,
-                            'index': 1.0,
-                            'middle': 1.0,
-                            'ring': 1.0,
-                            'pinky': 1.0
-                        }
-                        joint_groups = {
-                            'thumb': [1, 2, 3, 4],
-                            'index': [5, 6, 7, 8],
-                            'middle': [9, 10, 11, 12],
-                            'ring': [13, 14, 15, 16],
-                            'pinky': [17, 18, 19, 20]
-                        }
-                        
                         # Global scaling
                         right_joint_pos = right_joint_pos * scale_factors['global']
                         
@@ -1441,7 +1472,8 @@ class DualHandRetargetNode(Node):
                         joint_orientations=left_joint_ori,
                         finger_config=finger_config,
                         name_prefix="left_human_hand_",
-                        position_offset=[0, -0.4, 0]  # Offset for left human hand
+                        position_offset=[0, -0.4, 0],  # Offset for left human hand
+                        show_joints=self.show_joints
                     )
                 
                 if right_joint_pos is not None and len(right_joint_pos) > 0:
@@ -1469,7 +1501,8 @@ class DualHandRetargetNode(Node):
                         joint_orientations=right_joint_ori,
                         finger_config=finger_config,
                         name_prefix="right_human_hand_",
-                        position_offset=[0, 0.4, 0]  # Offset for right human hand
+                        position_offset=[0, 0.4, 0],  # Offset for right human hand
+                        show_joints=self.show_joints
                     )
                 
                 # Render scene
@@ -1552,13 +1585,18 @@ def main(args=None):
     parser.add_argument(
         "--topic",
         type=str,
-        default="/hand_kinematics_markers",
+        default="/joints_position",
         help="Topic to subscribe for hand kinematics markers",
     )
     parser.add_argument(
         "--disable-collision",
         action="store_true",
         help="Disable collision detection to avoid STL warnings",
+    )
+    parser.add_argument(
+        "--hide-joints",
+        action="store_true",
+        help="Hide joint visualization spheres",
     )
 
     # Parse arguments
@@ -1584,6 +1622,7 @@ def main(args=None):
                 retargeting_type=args.retargeting_type.lower(),
                 sim_vis=args.sim_vis,
                 topic=args.topic,
+                show_joints=not args.hide_joints,  # Pass the negated hide-joints flag
             )
             rclpy.spin(node)
         else:
@@ -1594,6 +1633,7 @@ def main(args=None):
                 retargeting_type=args.retargeting_type.lower(),
                 sim_vis=args.sim_vis,
                 topic=args.topic,
+                show_joints=not args.hide_joints,  # Pass the negated hide-joints flag
             )
             rclpy.spin(node)
     except KeyboardInterrupt:
