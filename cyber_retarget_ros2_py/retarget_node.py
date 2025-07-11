@@ -680,21 +680,6 @@ class HandRetargetNode(Node):
             [retargeting_joint_names.index(name) for name in sapien_joint_names]
         ).astype(int)
         
-        # # Set mapping from retargeting to robot
-        # if self.robot_name == "inspire":
-        #     retargeting_to_robot = np.array(
-        #         [retargeting_joint_names.index(name) for name in INSPIRE_JOINT_ORDER]
-        #     ).astype(int)
-        # elif self.robot_name == "roboterax":
-        #     if self.hand_type == "right":
-        #         retargeting_to_robot = np.array(
-        #             [retargeting_joint_names.index(name) for name in ROBOTERAX_RIGHT_JOINT_ORDER]
-        #         ).astype(int)
-        #     elif self.hand_type == "left":
-        #         retargeting_to_robot = np.array(
-        #             [retargeting_joint_names.index(name) for name in ROBOTERAX_LEFT_JOINT_ORDER]
-        #         ).astype(int)
-        # else:
         retargeting_to_robot = np.array(
             [retargeting_joint_names.index(name) for name in retargeting_joint_names]
         ).astype(int)
@@ -724,7 +709,7 @@ class HandRetargetNode(Node):
                         'index': 1.0,   # Index scale factor
                         'middle': 1.0,  # Middle scale factor
                         'ring': 1.0,    # Ring scale factor
-                        'pinky': 1.05  # Pinky scale factor
+                        'pinky': 1.0  # Pinky scale factor
                     }
                     
                     # Define joint groups
@@ -767,12 +752,7 @@ class HandRetargetNode(Node):
                     task_indices = indices[1, :]
                     ref_value = joint_pos[task_indices, :] - joint_pos[origin_indices, :]
 
-                    # print(f"origin_indices: {origin_indices}")
-                    # print(f"indices: {indices}")
-                    
                 qpos = retargeting.retarget(ref_value)
-                # print(f"ref_value: {ref_value}")
-                # print(f"qpos: {qpos}")
                 
                 # Set robot pose
                 robot.set_qpos(qpos[retargeting_to_sapien])
@@ -790,11 +770,6 @@ class HandRetargetNode(Node):
                         pos = link.get_pose().p
                         robot_joint_positions.append(pos)
                         robot_joint_names.append(joint.get_name())
-                
-                # # Print debug information
-                # logger.info(f"Robot joint count: {len(robot_joint_positions)}")
-                # if robot_joint_positions:
-                #     logger.info(f"Robot joint names: {robot_joint_names}")
                 
                 # Visualize finger joints
                 # Get palm position and finger joint positions
@@ -1266,54 +1241,29 @@ class DualHandRetargetNode(Node):
         right_joint_ori = None
         right_qpos = None
 
+        joint_groups = {
+            'thumb': [1, 2, 3, 4],
+            'index': [5, 6, 7, 8],
+            'middle': [9, 10, 11, 12],
+            'ring': [13, 14, 15, 16],
+            'pinky': [17, 18, 19, 20]
+        }
+
         if self.robot_name == "allegro":
-            scale_factors = {
-                'global': 1,
-                'thumb': 1.0,
-                'index': 1.0,
-                'middle': 1.0,
-                'ring': 1.0,
-                'pinky': 1.0
-            }
-            joint_groups = {
-                'thumb': [1, 2, 3, 4],
-                'index': [5, 6, 7, 8],
-                'middle': [9, 10, 11, 12],
-                'ring': [13, 14, 15, 16],
-                'pinky': [17, 18, 19, 20]
-            }
+            global_scale = 1.3
         elif self.robot_name == "roboterax":
-            scale_factors = {
-                'global': 1.3,
-                'thumb': 1.0,
-                'index': 1.0,
-                'middle': 1.0,
-                'ring': 1.0,
-                'pinky': 1.0
-            }
-            joint_groups = {
-                'thumb': [1, 2, 3, 4],
-                'index': [5, 6, 7, 8],
-                'middle': [9, 10, 11, 12],
-                'ring': [13, 14, 15, 16],
-                'pinky': [17, 18, 19, 20]
-            }
+            global_scale = 1.3
         else:
-            scale_factors = {
-                'global': 1.3,
-                'thumb': 1.0,
-                'index': 1.0,
-                'middle': 1.0,
-                'ring': 1.0,
-                'pinky': 1.0
-            }
-            joint_groups = {
-                'thumb': [1, 2, 3, 4],
-                'index': [5, 6, 7, 8],
-                'middle': [9, 10, 11, 12],
-                'ring': [13, 14, 15, 16],
-                'pinky': [17, 18, 19, 20]
-            }
+            global_scale = 1.3
+
+        scale_factors = {
+            'global': global_scale,
+            'thumb': 1.0,
+            'index': 1.0,
+            'middle': 1.0,
+            'ring': 1.0,
+            'pinky': 1.0
+        }
         # Main loop
         while True:
             try:
