@@ -1198,28 +1198,9 @@ class DualHandRetargetNode(Node):
             [right_retargeting_joint_names.index(name) for name in right_sapien_joint_names]
         ).astype(int)
         
-        # Set mapping from retargeting to robot
-        if self.robot_name == "inspire":
-            left_retargeting_to_robot = np.array(
-                [left_retargeting_joint_names.index(name) for name in INSPIRE_JOINT_ORDER]
-            ).astype(int)
-            right_retargeting_to_robot = np.array(
-                [right_retargeting_joint_names.index(name) for name in INSPIRE_JOINT_ORDER]
-            ).astype(int)
-        elif self.robot_name == "roboterax":
-            left_retargeting_to_robot = np.array(
-                [left_retargeting_joint_names.index(name) for name in ROBOTERAX_LEFT_JOINT_ORDER]
-            ).astype(int)
-            right_retargeting_to_robot = np.array(
-                [right_retargeting_joint_names.index(name) for name in ROBOTERAX_RIGHT_JOINT_ORDER]
-            ).astype(int)
-        else:
-            left_retargeting_to_robot = np.array(
-                [left_retargeting_joint_names.index(name) for name in left_retargeting_joint_names]
-            ).astype(int)
-            right_retargeting_to_robot = np.array(
-                [right_retargeting_joint_names.index(name) for name in right_retargeting_joint_names]
-            ).astype(int)
+        right_retargeting_to_robot = np.array(
+            [right_retargeting_joint_names.index(name) for name in right_retargeting_joint_names]
+        ).astype(int)
 
         # Create ROS2 node for publishing retargeted joint positions
         ros_context = rclpy.Context()
