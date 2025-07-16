@@ -6,18 +6,14 @@ from visualization_msgs.msg import MarkerArray
 from std_msgs.msg import Float32MultiArray
 import numpy as np
 import argparse
-import cv2
 from loguru import logger
 import time
 from pathlib import Path
 import multiprocessing
 from queue import Empty
-from scipy.spatial.transform import Rotation
 
 # Add debug information, print Python path
 import sys
-print("Python paths:")
-print(sys.path)
 
 # Filter SAPIEN STL warning messages
 import warnings
@@ -26,24 +22,6 @@ import logging
 logging.getLogger('sapien').setLevel(logging.ERROR)
 # Ignore specific warnings
 warnings.filterwarnings("ignore", message="loading multiple convex collision meshes from STL file")
-
-# Add local lib path to Python path
-import os
-import os.path as osp
-
-current_dir = osp.dirname(osp.abspath(__file__))
-package_dir = osp.dirname(osp.dirname(current_dir))
-lib_dir = osp.join(package_dir, "lib")
-sys.path.insert(0, lib_dir)
-print(f"Added local lib path: {lib_dir}")
-
-# Import dex_retargeting module from local lib
-import dex_retargeting
-print(f"dex_retargeting module location: {dex_retargeting.__file__}")
-# Comment out potentially error-causing reload statements
-# import importlib
-# importlib.reload(dex_retargeting)
-# importlib.reload(dex_retargeting.constants)
 
 # Import constants module directly from local
 from dex_retargeting.constants import (
@@ -57,6 +35,9 @@ from dex_retargeting.constants import (
 # Print all members in RobotName enum
 print("All members in RobotName enum:")
 print([name for name in RobotName.__members__])
+
+import os
+DEX_URDF_PATH = os.getenv("DEX_URDF_PATH", "")
 
 from dex_retargeting.retargeting_config import RetargetingConfig
 
@@ -165,14 +146,6 @@ def visualize_hand_joints(scene, joint_positions, fingertip_positions, hand_type
     # Get joint mappings from config
     joint_mapping = finger_config["joint_mapping"]
     
-    # Determine if left or right hand
-    is_left_hand = True
-    if hand_type is not None:
-        if isinstance(hand_type, str):
-            is_left_hand = hand_type.lower() == "left"
-        else:
-            is_left_hand = hand_type.name.lower() == "left"
-    
     # Define finger chains (only used for fingertip colors)
     finger_chains = {
         'thumb': [0, 1, 2, joint_mapping["thumb_end"]],
@@ -266,19 +239,6 @@ def visualize_hand_joints(scene, joint_positions, fingertip_positions, hand_type
                 fingertip.set_pose(sapien.Pose(tip_pos))
                 vis_objects.append(fingertip)
     
-    # Visualize fingertip joint axes
-    if joint_orientations is not None and show_joints:
-        # Define fingertip joints from config
-        fingertip_joints = {
-            'thumb': joint_mapping["thumb_end"],
-            'index': joint_mapping["index_end"],
-            'middle': joint_mapping["middle_end"],
-            'ring': joint_mapping["ring_end"],
-            'pinky': joint_mapping["pinky_end"]
-        }
-        
-        # visualize_joint_axes(scene, joint_positions, joint_orientations, fingertip_joints, finger_config)
-    
     # Return created visualization objects to allow removing them later
     return vis_objects
 
@@ -320,15 +280,15 @@ def process_hand_marker_array(msg, hand_type="left", glove_name="cyber"):
         joints_number = 20
 
     try:
-        # 创建标记ID到标记对象的映射
+        # Create mapping from marker ID to marker object
         markers_by_id = {marker.id: marker for marker in msg.markers}
         
-        # 检查是否存在腕部标记
+        # Check if wrist marker exists
         if 0 not in markers_by_id:
             print(f"No wrist marker (ID 0) found in {hand_type} hand message")
             return None, None
         
-        # 获取腕部标记的位置和方向
+        # Get wrist marker position and orientation
         wrist_marker = markers_by_id[0]
         wrist_pos = np.array([
             wrist_marker.pose.position.x,
@@ -343,21 +303,21 @@ def process_hand_marker_array(msg, hand_type="left", glove_name="cyber"):
             wrist_marker.pose.orientation.w
         ])
         
-        # 初始化位置数组 - 用于存储所有关节的世界坐标
+        # Initialize position array - for storing world coordinates of all joints
         keypoint_3d_array = np.zeros((joints_number, 3))
-        keypoint_3d_array[0] = wrist_pos  # 设置腕部位置
+        keypoint_3d_array[0] = wrist_pos  # Set wrist position
         
-        # 初始化方向数据数组
+        # Initialize orientation data array
         orientations_data = np.zeros((joints_number, 4))
-        orientations_data[0] = wrist_ori  # 设置腕部方向
+        orientations_data[0] = wrist_ori  # Set wrist orientation
         
-        # 处理所有其他关节标记
+        # Process all other joint markers
         for joint_id in range(1, joints_number):
             if joint_id not in markers_by_id:
-                # 如果缺少某个关节的标记，使用默认值
+                # Use default values if marker is missing for a joint
                 continue
             
-            # 获取关节标记的位置和方向
+            # Get joint marker position and orientation
             marker = markers_by_id[joint_id]
             keypoint_3d_array[joint_id] = [
                 marker.pose.position.x,
@@ -376,19 +336,19 @@ def process_hand_marker_array(msg, hand_type="left", glove_name="cyber"):
             #     wrist_pos, wrist_ori, joint_pos, joint_ori
             # )
             
-        # 1. 将所有关节坐标相对于腕部
+        # 1. Make all joint coordinates relative to wrist
         keypoint_3d_array = keypoint_3d_array - keypoint_3d_array[0:1, :]
         
-        # 2. 估计手腕旋转框架
+        # 2. Estimate wrist rotation frame
         mediapipe_wrist_rot = estimate_frame_from_hand_points(keypoint_3d_array)
         
-        # 3. 应用坐标系变换
+        # 3. Apply coordinate system transformation
         operator2mano = OPERATOR2MANO_RIGHT if hand_type.lower() == "right" else OPERATOR2MANO_LEFT
         joint_pos = keypoint_3d_array @ mediapipe_wrist_rot @ operator2mano
         
-        # 4. 为方向数据设置默认值
+        # 4. Set default values for orientation data
         orientations_data = np.zeros((joints_number, 4))
-        orientations_data[:, 3] = 1.0  # 设置为单位四元数
+        orientations_data[:, 3] = 1.0  # Set to unit quaternion
 
         
         return joint_pos, orientations_data
@@ -436,15 +396,12 @@ class HandRetargetNode(Node):
         # Create message queue
         self.marker_queue = multiprocessing.Queue(maxsize=1000)
         
-        # Find robot configuration directory
-        robot_config_path = Path(__file__).parent.parent.parent / "lib" / "dex-urdf" / "robots" / "hands"
+        robot_config_path = os.path.join(DEX_URDF_PATH, "robots/hands")
         
         # If directory doesn't exist, try other paths
-        if not robot_config_path.exists():
-            robot_config_path = Path("/home/wind/ros2_ws/src/dex_retarget_wrapper_ros2_py/lib/dex-urdf/robots/hands")
-            if not robot_config_path.exists():
-                self.get_logger().error(f"Cannot find robot configuration directory: {robot_config_path}")
-                raise ValueError(f"Cannot find robot configuration directory")
+        if not os.path.exists(robot_config_path):
+            self.get_logger().error(f"Cannot find robot configuration directory: {robot_config_path}")
+            raise ValueError(f"Cannot find robot configuration directory")
         
         self.get_logger().info(f"Using robot configuration path: {robot_config_path}")
         
@@ -746,7 +703,6 @@ class HandRetargetNode(Node):
                 
                 if retargeting_type == "POSITION":
                     ref_value = joint_pos[indices, :]
-                    # print(f"indices: {indices}")
                 else:
                     origin_indices = indices[0, :]
                     task_indices = indices[1, :]
@@ -1202,16 +1158,16 @@ class DualHandRetargetNode(Node):
             [right_retargeting_joint_names.index(name) for name in right_retargeting_joint_names]
         ).astype(int)
 
+        left_retargeting_to_robot = np.array(
+            [left_retargeting_joint_names.index(name) for name in left_retargeting_joint_names]
+        ).astype(int)
+
         # Create ROS2 node for publishing retargeted joint positions
         ros_context = rclpy.Context()
         ros_context.init()
         ros_node = rclpy.create_node("retargeting_publisher", context=ros_context)
         left_retargeted_pub = ros_node.create_publisher(Float32MultiArray, "/left_retargeted_qpos", 1)
         right_retargeted_pub = ros_node.create_publisher(Float32MultiArray, "/right_retargeted_qpos", 1)
-        
-        # Track the last processed hand data
-        last_left_data_time = time.time()
-        last_right_data_time = time.time()
         
         # Store the last processed data for both hands
         left_joint_pos = None
@@ -1295,8 +1251,6 @@ class DualHandRetargetNode(Node):
                         left_retargeted_msg.data = left_qpos[left_retargeting_to_robot].flatten().tolist()
                         left_retargeted_pub.publish(left_retargeted_msg)
                         
-                        # Update timestamp
-                        last_left_data_time = time.time()
                 except Empty:
                     # No new left hand data, continue
                     pass
@@ -1347,8 +1301,6 @@ class DualHandRetargetNode(Node):
                         right_retargeted_msg.data = right_qpos[right_retargeting_to_robot].flatten().tolist()
                         right_retargeted_pub.publish(right_retargeted_msg)
                         
-                        # Update timestamp
-                        last_right_data_time = time.time()
                 except Empty:
                     # No new right hand data, continue
                     pass

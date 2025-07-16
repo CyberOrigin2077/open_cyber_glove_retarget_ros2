@@ -1,4 +1,4 @@
-# cyber_retarget_ros2_py
+# open
 
 ## 1. Setup / Installation and Requirements
 
@@ -25,11 +25,12 @@ Make sure you have sourced your ROS2 environment and installed the required ROS2
 sudo apt install ros-${ROS_DISTRO}-rclpy ros-${ROS_DISTRO}-std-msgs ros-${ROS_DISTRO}-visualization-msgs ros-${ROS_DISTRO}-pinocchio
 ```
 
-#### Install dex-realtime-retargeting
-Clone and install [dex-realtime-retargeting](https://github.com/CyberOrigin2077/dex_realtime_retargeting) and its dependencies. Set the environment variable `DEX_RETARGETING_PATH` to the root of the dex-realtime-retargeting repository:
+#### Install dex-retargeting dependencies
+
+Refer to [dex-retargeting](https://github.com/dexsuite/dex-retargeting). Download [dex-urdf](https://github.com/dexsuite/dex-urdf) and set the environment variable `DEX_RETARGETING_PATH` to the root of the dex-urdf repository.
 
 ```bash
-export DEX_RETARGETING_PATH=/path/to/dex_realtime_retargeting
+export DEX_RETARGETING_PATH=/path/to/dex-urdf
 ```
 
 ## 2. How to Run the Node
@@ -155,6 +156,11 @@ This node is designed to work with the `glove_visualizer` package, which publish
 ## 8. Additional Notes
 - If you want to enable simulation visualization, make sure you have a working SAPIEN installation and use the `--sim-vis` flag.
 - For more details on configuration files and supported robots, refer to the [dex-realtime-retargeting documentation](https://github.com/CyberOrigin2077/dex_realtime_retargeting).
+
+## 9. Acknowledgements
+
+This project heavily borrows code and concepts from the [dex-retargeting](https://github.com/DFKI-Interactive-Machine-Learning/dex-retargeting) project. We are grateful to the original authors for their excellent work in real-time hand motion retargeting. The core retargeting algorithms, optimization methods, and much of the visualization code are adapted from their implementation. Our modifications focus on ROS2 integration with OpenCyberGlove while maintaining compatibility with their proven retargeting approach.
+
 
 ---
 Maintainer: Jessey (<jessey.li@cyberorigin.ai>)
