@@ -77,7 +77,7 @@ The node supports the following command line arguments:
   - Available options: "dexpilot", "vector", "position"
 - `--sim-vis`: Enable simulation visualization window
 - `--dual-hands`: Display both left and right hands simultaneously
-- `--topic`: Topic to subscribe for hand kinematics markers (default: "/hand_kinematics_markers")
+- `--topic`: Topic to subscribe for hand kinematics markers (default: "/joints_position")
 - `--disable-collision`: Disable collision detection to avoid STL warnings
 - `--hide-joints`: Hide joint visualization spheres in the visualization window
 
@@ -101,7 +101,7 @@ ros2 run open_cyber_glove_retarget_ros2 retarget_node --robot-name inspire --han
 ## 3. Subscribed and Published Topics
 
 ### Subscribed Topics
-- `/hand_kinematics_markers` (`visualization_msgs/MarkerArray`):
+- `/joints_position` (`visualization_msgs/MarkerArray`):
   - Input marker array containing the hand kinematics (joint positions and orientations).
   - The node filters markers based on the namespace in the marker message to determine which hand they belong to.
 
@@ -164,11 +164,11 @@ If you see warnings about "loading multiple convex collision meshes from STL fil
 ### No Marker Data Received
 Make sure that the topic you're subscribing to is being published. You can check this with:
 ```bash
-ros2 topic info /hand_kinematics_markers
+ros2 topic info /joints_position
 ```
 
 ### Integration with Glove Visualizer
-This node is designed to work with the `glove_visualizer` package, which publishes hand kinematics data to the `/hand_kinematics_markers` topic. Make sure the `hand_display_node` from that package is running.
+This node is designed to work with the `glove_visualizer` package, which publishes hand kinematics data to the `/joints_position` topic. Make sure the `hand_display_node` from that package is running.
 
 ## 8. Additional Notes
 - If you want to enable simulation visualization, make sure you have a working SAPIEN installation and use the `--sim-vis` flag.

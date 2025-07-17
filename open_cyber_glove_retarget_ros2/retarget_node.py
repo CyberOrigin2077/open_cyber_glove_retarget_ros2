@@ -430,7 +430,7 @@ class HandRetargetNode(Node):
         self.consumer_process.start()
         
         # Create subscriber for hand kinematics markers
-        marker_topic_name = topic if topic else "/hand_kinematics_markers"
+        marker_topic_name = topic if topic else "/joints_position"
             
         self.marker_sub = self.create_subscription(
             MarkerArray, marker_topic_name, self.marker_callback, 1
@@ -868,14 +868,12 @@ class DualHandRetargetNode(Node):
         self.right_marker_queue = multiprocessing.Queue(maxsize=1000)
         
         # Find robot configuration directory
-        robot_config_path = Path(__file__).parent.parent.parent / "lib" / "dex-urdf" / "robots" / "hands"
+        robot_config_path = os.path.join(DEX_URDF_PATH, "robots/hands")
         
         # If directory doesn't exist, try other paths
         if not robot_config_path.exists():
-            robot_config_path = Path("/home/wind/ros2_ws/src/dex_retarget_wrapper_ros2_py/lib/dex-urdf/robots/hands")
-            if not robot_config_path.exists():
-                self.get_logger().error(f"Cannot find robot configuration directory: {robot_config_path}")
-                raise ValueError(f"Cannot find robot configuration directory")
+            self.get_logger().error(f"Cannot find robot configuration directory: {robot_config_path}")
+            raise ValueError(f"Cannot find robot configuration directory")
         
         self.get_logger().info(f"Using robot configuration path: {robot_config_path}")
         
@@ -909,7 +907,7 @@ class DualHandRetargetNode(Node):
         self.consumer_process.start()
         
         # Create subscriber for hand kinematics markers
-        marker_topic_name = topic if topic else "/hand_kinematics_markers"
+        marker_topic_name = topic if topic else "/joints_position"
             
         self.marker_sub = self.create_subscription(
             MarkerArray, marker_topic_name, self.marker_callback, 1
@@ -1029,7 +1027,7 @@ class DualHandRetargetNode(Node):
         cam = scene.add_camera(
             name="main_camera", width=800, height=600, fovy=1, near=0.1, far=10
         )
-        cam.set_local_pose(sapien.Pose([0.7, 0.0, 0.3], [0, -0.2588, 0, 0.9659]))  # 从侧面-30度角观察
+        cam.set_local_pose(sapien.Pose([0.7, 0.0, 0.3], [0, -0.2588, 0, 0.9659]))
 
         # Set up viewer
         viewer = Viewer()
