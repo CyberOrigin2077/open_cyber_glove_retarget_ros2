@@ -285,7 +285,7 @@ def process_hand_marker_array(msg, hand_type="left", glove_name="cyber"):
         
         # Check if wrist marker exists
         if 0 not in markers_by_id:
-            print(f"No wrist marker (ID 0) found in {hand_type} hand message")
+            logger.warning(f"No wrist marker (ID 0) found in {hand_type} hand message")
             return None, None
         
         # Get wrist marker position and orientation
