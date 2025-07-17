@@ -1,13 +1,18 @@
-# open
+# OpenCyberGlove Retarget Wrapper ROS2
+
+![Allegro](media/allegro.webp)
+![Inspire](media/inspire.webp)
+![Ability](media/ability.webp)
+
 
 ## 1. Setup / Installation and Requirements
 
-This package provides a ROS2 node for real-time robot hand retargeting using marker-based hand kinematics and the [dex-realtime-retargeting](https://github.com/CyberOrigin2077/dex_realtime_retargeting) library.
+This package provides a ROS2 node for real-time robot hand retargeting using marker-based hand kinematics and the [dex-retargeting](https://github.com/dexsuite/dex-retargeting) library.
 
 ### Requirements
 - ROS2 (tested with Foxy/Galactic/Humble/Jazzy)
 - Python 3.7+
-- [dex-realtime-retargeting](https://github.com/CyberOrigin2077/dex_realtime_retargeting) (and its dependencies)
+- [dex-retargeting](https://github.com/dexsuite/dex-retargeting) (and its dependencies)
 - [sapien](https://sapien.ucsd.edu/) (for simulation visualization, optional)
 - numpy
 - rclpy
@@ -27,17 +32,17 @@ sudo apt install ros-${ROS_DISTRO}-rclpy ros-${ROS_DISTRO}-std-msgs ros-${ROS_DI
 
 #### Install dex-retargeting dependencies
 
-Refer to [dex-retargeting](https://github.com/dexsuite/dex-retargeting). Download [dex-urdf](https://github.com/dexsuite/dex-urdf) and set the environment variable `DEX_RETARGETING_PATH` to the root of the dex-urdf repository.
+Refer to [dex-retargeting](https://github.com/dexsuite/dex-retargeting). Download [dex-urdf](https://github.com/dexsuite/dex-urdf) and set the environment variable `DEX_URDF_PATH` to the root of the dex-urdf repository.
 
 ```bash
-export DEX_RETARGETING_PATH=/path/to/dex-urdf
+export DEX_URDF_PATH=/path/to/dex-urdf
 ```
 
 ## 2. How to Run the Node
 
 Build the ROS2 workspace as usual:
 ```bash
-colcon build --packages-select cyber_retarget_ros2_py
+colcon build --packages-select open_cyber_glove_retarget_ros2
 source install/setup.bash
 ```
 
@@ -46,7 +51,7 @@ source install/setup.bash
 Run the retargeting node with the required arguments:
 
 ```bash
-ros2 run cyber_retarget_ros2_py retarget_node --robot-name roboterax --hand-type right
+ros2 run open_cyber_glove_retarget_ros2 retarget_node --robot-name inspire --hand-type right
 ```
 
 ### Command Line Arguments
@@ -54,7 +59,7 @@ ros2 run cyber_retarget_ros2_py retarget_node --robot-name roboterax --hand-type
 The node supports the following command line arguments:
 
 - `--robot-name`: Robot name to use for retargeting (default: "inspire")
-  - Available options: "inspire", "allegro", "shadow", "svh", "leap", "ability", "panda", "roboterax"
+  - Available options: "inspire", "allegro", "shadow", "svh", "leap", "ability", "panda"
 - `--hand-type`: Hand type (right or left) (default: "right")
 - `--retargeting-type`: Retargeting algorithm type (default: "dexpilot")
   - Available options: "dexpilot", "vector", "position"
@@ -68,17 +73,17 @@ The node supports the following command line arguments:
 
 #### Single Hand Retargeting
 ```bash
-ros2 run cyber_retarget_ros2_py retarget_node --robot-name roboterax --hand-type right --sim-vis
+ros2 run open_cyber_glove_retarget_ros2 retarget_node --robot-name inspire --hand-type right --sim-vis
 ```
 
 #### Dual Hand Retargeting
 ```bash
-ros2 run cyber_retarget_ros2_py retarget_node --robot-name roboterax --dual-hands --sim-vis
+ros2 run open_cyber_glove_retarget_ros2 retarget_node --robot-name inspire --dual-hands --sim-vis
 ```
 
 #### Custom Topic
 ```bash
-ros2 run cyber_retarget_ros2_py retarget_node --robot-name roboterax --hand-type right --topic /custom/hand_markers
+ros2 run open_cyber_glove_retarget_ros2 retarget_node --robot-name inspire --hand-type right --topic /custom/hand_markers
 ```
 
 ## 3. Subscribed and Published Topics
@@ -134,7 +139,7 @@ In dual-hand mode, both hands are visualized in the same window with an optimize
 By default, both the human hand and robot hand joints are visualized as colored spheres. If you want to hide these joint spheres and fingertip indicators (for clearer visualization or performance reasons), you can use the `--hide-joints` parameter:
 
 ```bash
-ros2 run cyber_retarget_ros2_py retarget_node --robot-name roboterax --dual-hands --sim-vis --hide-joints
+ros2 run open_cyber_glove_retarget_ros2 retarget_node --robot-name inspire --dual-hands --sim-vis --hide-joints
 ```
 
 This will still visualize the hand models but without the additional joint and fingertip spheres, resulting in a cleaner visualization.
@@ -155,11 +160,11 @@ This node is designed to work with the `glove_visualizer` package, which publish
 
 ## 8. Additional Notes
 - If you want to enable simulation visualization, make sure you have a working SAPIEN installation and use the `--sim-vis` flag.
-- For more details on configuration files and supported robots, refer to the [dex-realtime-retargeting documentation](https://github.com/CyberOrigin2077/dex_realtime_retargeting).
+- For more details on configuration files and supported robots, refer to the [dex-retargeting documentation](https://github.com/CyberOrigin2077/dex_realtime_retargeting).
 
 ## 9. Acknowledgements
 
-This project heavily borrows code and concepts from the [dex-retargeting](https://github.com/DFKI-Interactive-Machine-Learning/dex-retargeting) project. We are grateful to the original authors for their excellent work in real-time hand motion retargeting. The core retargeting algorithms, optimization methods, and much of the visualization code are adapted from their implementation. Our modifications focus on ROS2 integration with OpenCyberGlove while maintaining compatibility with their proven retargeting approach.
+This project heavily borrows code and concepts from the [dex-retargeting](https://github.com/dexsuite/dex-retargeting) project. We are grateful to the original authors for their excellent work in real-time hand motion retargeting. The core retargeting algorithms, optimization methods, and much of the visualization code are adapted from their implementation. Our modifications focus on ROS2 integration with OpenCyberGlove while maintaining compatibility with their proven retargeting approach.
 
 
 ---

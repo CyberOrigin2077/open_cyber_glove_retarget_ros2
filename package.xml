@@ -1,11 +1,11 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>cyber_retarget_ros2_py</name>
-  <version>0.0.0</version>
-  <description>ROS2 package for robot hand retargeting</description>
-  <maintainer email="lizimo061@gmail.com">zimo</maintainer>
-  <license>Apache License 2.0</license>
+  <name>open_cyber_glove_retarget_ros2</name>
+  <version>0.1.0</version>
+  <description>ROS2 package for OpenCyberGlove retargeting</description>
+  <maintainer email="jessey.li@cyberorigin.ai">zimo</maintainer>
+  <license>BSD-3-Clause</license>
 
   <depend>rclpy</depend>
   <depend>visualization_msgs</depend>
