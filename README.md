@@ -7,19 +7,24 @@
 
 ## 1. Setup / Installation and Requirements
 
-This package provides a ROS2 node for real-time robot hand retargeting using marker-based hand kinematics and the [dex-retargeting](https://github.com/dexsuite/dex-retargeting) library.
+This package provides a ROS2 node for real-time robot hand retargeting using marker-based hand kinematics, leveraging the [dex-retargeting](https://github.com/dexsuite/dex-retargeting) library. Joint information is sourced from [open_cyber_glove_ros2](https://github.com/CyberOrigin2077/open_cyber_glove_ros2), and the retargeted robot joint positions (`qpos`) are published for downstream use. 
+
+To control a real robot, you will need to convert the published `qpos` values into control signals compatible with your specific hardware. Example scripts for this conversion will be provided soon.
 
 ### Requirements
-- ROS2 (tested with Foxy/Galactic/Humble/Jazzy)
+- ROS2 (tested with Jazzy)
 - Python 3.7+
 - [dex-retargeting](https://github.com/dexsuite/dex-retargeting) (and its dependencies)
-- [sapien](https://sapien.ucsd.edu/) (for simulation visualization, optional)
+- [sapien](https://sapien.ucsd.edu/) (for simulation visualization)
 - numpy
 - rclpy
 - std_msgs
 - visualization_msgs
 
 #### Install Python dependencies
+
+It is highly recommended to use a Python virtual environment for managing dependencies.
+
 ```bash
 pip install numpy sapien
 ```
@@ -36,6 +41,13 @@ Refer to [dex-retargeting](https://github.com/dexsuite/dex-retargeting). Downloa
 
 ```bash
 export DEX_URDF_PATH=/path/to/dex-urdf
+```
+
+#### Add your virtual environment to the Python path
+
+If you are using a Python virtual environment, make sure its `site-packages` directory is included in your `PYTHONPATH` so ROS2 can find all dependencies.
+```bash
+export PYTHONPATH=/path/to/your/venv/site-packages/:$PYTHONPATH
 ```
 
 ## 2. How to Run the Node
