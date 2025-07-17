@@ -180,5 +180,4 @@ This project heavily borrows code and concepts from the [dex-retargeting](https:
 
 
 ---
-Maintainer: Jessey (<jessey.li@cyberorigin.ai>)
 License: BSD-3
