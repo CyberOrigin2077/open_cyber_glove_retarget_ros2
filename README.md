@@ -15,7 +15,7 @@ To control a real robot, you will need to convert the published `qpos` values in
 - ROS2 (tested with Jazzy)
 - Python 3.7+
 - [dex-retargeting](https://github.com/dexsuite/dex-retargeting) (and its dependencies)
-- [sapien](https://sapien.ucsd.edu/) (for simulation visualization)
+- [sapien](https://sapien.ucsd.edu/) (for simulation visualization, tested with 3.0.0b1)
 - numpy
 - rclpy
 - std_msgs
@@ -172,7 +172,10 @@ This node is designed to work with the `glove_visualizer` package, which publish
 
 ## 8. Additional Notes
 - If you want to enable simulation visualization, make sure you have a working SAPIEN installation and use the `--sim-vis` flag.
-- For more details on configuration files and supported robots, refer to the [dex-retargeting documentation](https://github.com/CyberOrigin2077/dex_realtime_retargeting).
+- For more details on configuration files and supported robots, refer to the [dex-retargeting documentation](https://github.com/dexsuite/dex-retargeting).
+- Supporting hands roadmap:
+  - [ ] Roboterax
+  - [ ] RO Hand
 
 ## 9. Acknowledgements
 
