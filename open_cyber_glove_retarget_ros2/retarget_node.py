@@ -790,7 +790,7 @@ class HandRetargetNode(Node):
                         )
 
                 # Render scene
-                if self.sim_vis:
+                if sim_vis:
                     for _ in range(2):
                         viewer.render()
                 
