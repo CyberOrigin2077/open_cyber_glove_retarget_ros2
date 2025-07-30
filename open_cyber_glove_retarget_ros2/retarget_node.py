@@ -394,7 +394,7 @@ class HandRetargetNode(Node):
         )
         
         # Create message queue
-        self.marker_queue = multiprocessing.Queue(maxsize=1000)
+        self.marker_queue = multiprocessing.Queue(maxsize=1)
         
         robot_config_path = os.path.join(DEX_URDF_PATH, "robots/hands")
         
@@ -558,10 +558,6 @@ class HandRetargetNode(Node):
         viewer.control_window.toggle_camera_lines(False)
         viewer.set_camera_pose(cam.get_local_pose())
         
-        # If sim_vis is disabled, hide the viewer window
-        if not sim_vis:
-            viewer.hide_window()
-
         # Load robot
         loader = scene.create_urdf_loader()
         filepath = Path(config.urdf_path)
@@ -794,8 +790,9 @@ class HandRetargetNode(Node):
                         )
 
                 # Render scene
-                for _ in range(2):
-                    viewer.render()
+                if sim_vis:
+                    for _ in range(2):
+                        viewer.render()
                 
                 # Publish retargeted joint positions
                 retargeted_msg = Float32MultiArray()
@@ -864,8 +861,8 @@ class DualHandRetargetNode(Node):
         )
         
         # Create message queues for both hands
-        self.left_marker_queue = multiprocessing.Queue(maxsize=1000)
-        self.right_marker_queue = multiprocessing.Queue(maxsize=1000)
+        self.left_marker_queue = multiprocessing.Queue(maxsize=1)
+        self.right_marker_queue = multiprocessing.Queue(maxsize=1)
         
         # Find robot configuration directory
         robot_config_path = os.path.join(DEX_URDF_PATH, "robots/hands")
@@ -1037,10 +1034,6 @@ class DualHandRetargetNode(Node):
         viewer.control_window.toggle_camera_lines(False)
         viewer.set_camera_pose(cam.get_local_pose())
         
-        # If sim_vis is disabled, hide the viewer window
-        if not sim_vis:
-            viewer.hide_window()
-
         # Create URDF loader
         loader = scene.create_urdf_loader()
         loader.load_multiple_collisions_from_file = True
@@ -1387,8 +1380,9 @@ class DualHandRetargetNode(Node):
                     )
                 
                 # Render scene
-                for _ in range(2):
-                    viewer.render()
+                if sim_vis:
+                    for _ in range(2):
+                        viewer.render()
 
                 # Process ROS2 events
                 rclpy.spin_once(ros_node, timeout_sec=0.001)
